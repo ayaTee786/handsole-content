@@ -23,6 +23,7 @@
       "dest": "/$1"
     }
   ],
+ {
   "functions": {
     "api/generate-listing.js": {
       "maxDuration": 60
