@@ -245,7 +245,7 @@ ${listingData.keywordsUsed || 'N/A'}
           className={`copy-btn ${copiedSection === section ? 'copied' : ''}`}
           onClick={() => copyToClipboard(content, section)}
         >
-          {copiedSection === section ? '✓ Copied!' : 'Copy'}
+          {copiedSection === section ? 'Copied' : 'Copy'}
         </button>
       </div>
       <div className="card-content">
@@ -257,8 +257,8 @@ ${listingData.keywordsUsed || 'N/A'}
   return (
     <div className="app">
       <header className="header">
-        <h1>👞 Handsole Etsy Generator</h1>
-        <p>Transform product images into SEO-optimized Etsy listings</p>
+        <h1>HAND<span>SOLE</span></h1>
+        <p>Etsy Listing Generator</p>
       </header>
 
       <div className="tabs">
@@ -266,20 +266,20 @@ ${listingData.keywordsUsed || 'N/A'}
           className={`tab ${activeTab === 'upload' ? 'active' : ''}`}
           onClick={() => setActiveTab('upload')}
         >
-          📷 Upload
+          Upload
         </button>
         <button 
           className={`tab ${activeTab === 'listing' ? 'active' : ''}`}
           onClick={() => setActiveTab('listing')}
           disabled={!listing}
         >
-          📝 Listing
+          Listing
         </button>
         <button 
           className={`tab ${activeTab === 'history' ? 'active' : ''}`}
           onClick={() => setActiveTab('history')}
         >
-          📚 History ({listingHistory.length})
+          History ({listingHistory.length})
         </button>
       </div>
 
@@ -301,7 +301,7 @@ ${listingData.keywordsUsed || 'N/A'}
                 style={{ display: 'none' }}
               />
               <p>Drop product images here or click to upload</p>
-              <span>Upload multiple angles for best results</span>
+              <span>Use clear, well-lit photos for best results</span>
             </div>
 
             {images.length > 0 && (
@@ -317,12 +317,12 @@ ${listingData.keywordsUsed || 'N/A'}
             )}
 
             <div className="options-section">
-              <h3>Additional Options</h3>
+              <h3>Options</h3>
               <div className="form-group">
                 <label>Additional Colors Available</label>
                 <input
                   type="text"
-                  placeholder="e.g., Navy Blue, Burgundy, Tan (comma-separated)"
+                  placeholder="e.g., Navy Blue, Burgundy, Tan"
                   value={productDetails.additionalColors}
                   onChange={(e) => setProductDetails(prev => ({ ...prev, additionalColors: e.target.value }))}
                 />
@@ -337,7 +337,7 @@ ${listingData.keywordsUsed || 'N/A'}
               </div>
             </div>
 
-            {error && <div className="error-message">⚠️ {error}</div>}
+            {error && <div className="error-message">{error}</div>}
 
             <button 
               className="generate-btn"
@@ -347,10 +347,10 @@ ${listingData.keywordsUsed || 'N/A'}
               {loading ? (
                 <>
                   <span className="spinner"></span>
-                  Generating... (up to 60 seconds)
+                  Generating...
                 </>
               ) : (
-                <>✨ Generate Etsy Listing</>
+                'Generate Listing'
               )}
             </button>
           </div>
@@ -362,10 +362,10 @@ ${listingData.keywordsUsed || 'N/A'}
               <h2>Generated Listing</h2>
               <div className="header-actions">
                 <button className="download-btn" onClick={() => downloadListing()}>
-                  📥 Download
+                  Download
                 </button>
-                <button className="new-btn" onClick={() => { setActiveTab('upload'); setListing(null); setImages([]); setImageBase64s([]); }}>
-                  ➕ New Listing
+                <button className="new-btn" onClick={() => { setActiveTab('upload'); setListing(null); setImages([]); setImageBase64s([]); setSelectedHistoryItem(null); }}>
+                  New Listing
                 </button>
               </div>
             </div>
@@ -376,33 +376,33 @@ ${listingData.keywordsUsed || 'N/A'}
               </div>
             )}
 
-            <ListingCard title="📊 1. Product Analysis" content={listing.productAnalysis} section="analysis" />
-            <ListingCard title="🎯 2. Focus Keyword" content={listing.focusKeyword} section="focus" />
-            <ListingCard title="🔑 3. Supporting Keywords" content={listing.supportingKeywords} section="supporting" />
-            <ListingCard title={`📝 4. Etsy Title (${listing.title?.length || 0} chars)`} content={listing.title} section="title" />
-            <ListingCard title="🏷️ 5. Etsy 13 Tags" content={listing.tags} section="tags" />
-            <ListingCard title="📄 6. Description" content={listing.description} section="description" />
-            <ListingCard title="📋 7. Etsy Attributes" content={listing.attributes} section="attributes" />
-            <ListingCard title="🖼️ 8. Image Alt Texts" content={listing.altTexts} section="alts" />
-            <ListingCard title="📁 9. Image File Names" content={listing.fileNames} section="files" />
-            <ListingCard title="🔢 10. SKU" content={listing.sku} section="sku" />
-            <ListingCard title="📂 11. Shop Category" content={listing.shopCategory} section="category" />
-            <ListingCard title="🎉 12. Best Occasions" content={listing.occasions} section="occasions" />
-            <ListingCard title="📈 13. Keywords Used Count" content={listing.keywordsUsed} section="keywords" />
+            <ListingCard title="1. Product Analysis" content={listing.productAnalysis} section="analysis" />
+            <ListingCard title="2. Focus Keyword" content={listing.focusKeyword} section="focus" />
+            <ListingCard title="3. Supporting Keywords" content={listing.supportingKeywords} section="supporting" />
+            <ListingCard title={`4. Etsy Title (${listing.title?.length || 0} chars)`} content={listing.title} section="title" />
+            <ListingCard title="5. Etsy 13 Tags" content={listing.tags} section="tags" />
+            <ListingCard title="6. Description" content={listing.description} section="description" />
+            <ListingCard title="7. Etsy Attributes" content={listing.attributes} section="attributes" />
+            <ListingCard title="8. Image Alt Texts" content={listing.altTexts} section="alts" />
+            <ListingCard title="9. Image File Names" content={listing.fileNames} section="files" />
+            <ListingCard title="10. SKU" content={listing.sku} section="sku" />
+            <ListingCard title="11. Shop Category" content={listing.shopCategory} section="category" />
+            <ListingCard title="12. Best Occasions" content={listing.occasions} section="occasions" />
+            <ListingCard title="13. Keywords Used Count" content={listing.keywordsUsed} section="keywords" />
           </div>
         )}
 
         {activeTab === 'history' && (
           <div className="history-section">
             <div className="history-header">
-              <h2>📚 Listing History</h2>
+              <h2>Listing History</h2>
               {listingHistory.length > 0 && (
                 <div className="history-actions">
                   <button className="export-btn" onClick={exportAllHistory}>
-                    📤 Export All
+                    Export All
                   </button>
                   <button className="clear-btn" onClick={clearHistory}>
-                    🗑️ Clear All
+                    Clear All
                   </button>
                 </div>
               )}
@@ -411,7 +411,7 @@ ${listingData.keywordsUsed || 'N/A'}
             {listingHistory.length === 0 ? (
               <div className="empty-history">
                 <p>No listings generated yet.</p>
-                <p>Upload a product image to create your first listing!</p>
+                <p>Upload a product image to create your first listing.</p>
               </div>
             ) : (
               <div className="history-grid">
@@ -436,14 +436,14 @@ ${listingData.keywordsUsed || 'N/A'}
                         onClick={(e) => { e.stopPropagation(); downloadListing(item.listing); }}
                         title="Download"
                       >
-                        📥
+                        ↓
                       </button>
                       <button 
                         className="delete-btn" 
                         onClick={(e) => deleteHistoryItem(item.id, e)}
                         title="Delete"
                       >
-                        🗑️
+                        ×
                       </button>
                     </div>
                   </div>
@@ -455,8 +455,8 @@ ${listingData.keywordsUsed || 'N/A'}
       </main>
 
       <footer className="footer">
-        <p>Handsole Etsy Listing Generator • Powered by Claude AI</p>
-        <p className="footer-note">Listings saved locally in your browser</p>
+        <p>Handsole Content Generator</p>
+        <p className="footer-note">Listings saved locally in browser</p>
       </footer>
     </div>
   );
