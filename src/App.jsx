@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import './App.css';
 
 function App() {
@@ -13,6 +13,27 @@ function App() {
   const [error, setError] = useState(null);
   const [activeTab, setActiveTab] = useState('upload');
   const [copiedSection, setCopiedSection] = useState(null);
+  const [listingHistory, setListingHistory] = useState([]);
+  const [selectedHistoryItem, setSelectedHistoryItem] = useState(null);
+
+  // Load history from localStorage on mount
+  useEffect(() => {
+    const saved = localStorage.getItem('handsole-listing-history');
+    if (saved) {
+      try {
+        setListingHistory(JSON.parse(saved));
+      } catch (e) {
+        console.error('Failed to load history:', e);
+      }
+    }
+  }, []);
+
+  // Save history to localStorage whenever it changes
+  useEffect(() => {
+    if (listingHistory.length > 0) {
+      localStorage.setItem('handsole-listing-history', JSON.stringify(listingHistory));
+    }
+  }, [listingHistory]);
 
   const handleImageUpload = useCallback((e) => {
     const files = Array.from(e.target.files || e.dataTransfer?.files || []);
@@ -52,7 +73,7 @@ function App() {
 
     try {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 120000); // 2 minute timeout
+      const timeoutId = setTimeout(() => controller.abort(), 120000);
 
       const response = await fetch('/api/generate-listing', {
         method: 'POST',
@@ -74,6 +95,19 @@ function App() {
 
       const data = await response.json();
       setListing(data);
+      
+      // Save to history with thumbnail
+      const historyItem = {
+        id: Date.now(),
+        date: new Date().toISOString(),
+        thumbnail: `data:image/jpeg;base64,${imageBase64s[0]}`,
+        title: data.title || 'Untitled Listing',
+        focusKeyword: data.focusKeyword || '',
+        sku: data.sku || '',
+        listing: data
+      };
+      
+      setListingHistory(prev => [historyItem, ...prev]);
       setActiveTab('listing');
     } catch (err) {
       if (err.name === 'AbortError') {
@@ -96,71 +130,109 @@ function App() {
     }
   };
 
-  const downloadListing = () => {
-    if (!listing) return;
+  const downloadListing = (listingData = listing) => {
+    if (!listingData) return;
 
     const content = `
 HANDSOLE ETSY LISTING PACKAGE
+Generated: ${new Date().toLocaleString()}
 =============================
 
-PRODUCT ANALYSIS
-----------------
-${listing.productAnalysis || 'N/A'}
-
-FOCUS KEYWORD
--------------
-${listing.focusKeyword || 'N/A'}
-
-SUPPORTING KEYWORDS
+1. PRODUCT ANALYSIS
 -------------------
-${listing.supportingKeywords || 'N/A'}
+${listingData.productAnalysis || 'N/A'}
 
-ETSY TITLE (${listing.title?.length || 0} chars)
-----------
-${listing.title || 'N/A'}
-
-ETSY 13 TAGS
-------------
-${listing.tags || 'N/A'}
-
-DESCRIPTION
------------
-${listing.description || 'N/A'}
-
-ETSY ATTRIBUTES
----------------
-${listing.attributes || 'N/A'}
-
-IMAGE ALT TEXTS
----------------
-${listing.altTexts || 'N/A'}
-
-IMAGE FILE NAMES
+2. FOCUS KEYWORD
 ----------------
-${listing.fileNames || 'N/A'}
+${listingData.focusKeyword || 'N/A'}
 
-SKU
----
-${listing.sku || 'N/A'}
+3. SUPPORTING KEYWORDS
+----------------------
+${listingData.supportingKeywords || 'N/A'}
 
-SHOP CATEGORY
--------------
-${listing.shopCategory || 'N/A'}
-
-BEST OCCASIONS
+4. ETSY TITLE (${listingData.title?.length || 0} chars)
 --------------
-${listing.occasions || 'N/A'}
+${listingData.title || 'N/A'}
 
-KEYWORDS USED COUNT
+5. ETSY 13 TAGS
+---------------
+${listingData.tags || 'N/A'}
+
+6. DESCRIPTION
+--------------
+${listingData.description || 'N/A'}
+
+7. ETSY ATTRIBUTES
+------------------
+${listingData.attributes || 'N/A'}
+
+8. IMAGE ALT TEXTS
+------------------
+${listingData.altTexts || 'N/A'}
+
+9. IMAGE FILE NAMES
 -------------------
-${listing.keywordsUsed || 'N/A'}
+${listingData.fileNames || 'N/A'}
+
+10. SKU
+-------
+${listingData.sku || 'N/A'}
+
+11. SHOP CATEGORY
+-----------------
+${listingData.shopCategory || 'N/A'}
+
+12. BEST OCCASIONS
+------------------
+${listingData.occasions || 'N/A'}
+
+13. KEYWORDS USED COUNT
+-----------------------
+${listingData.keywordsUsed || 'N/A'}
 `;
 
     const blob = new Blob([content], { type: 'text/plain' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `handsole-etsy-listing-${Date.now()}.txt`;
+    const sku = listingData.sku?.replace(/[^a-zA-Z0-9-]/g, '') || 'listing';
+    a.download = `handsole-${sku}-${Date.now()}.txt`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const viewHistoryItem = (item) => {
+    setSelectedHistoryItem(item);
+    setListing(item.listing);
+    setActiveTab('listing');
+  };
+
+  const deleteHistoryItem = (id, e) => {
+    e.stopPropagation();
+    if (confirm('Delete this listing from history?')) {
+      setListingHistory(prev => prev.filter(item => item.id !== id));
+      if (selectedHistoryItem?.id === id) {
+        setSelectedHistoryItem(null);
+        setListing(null);
+      }
+    }
+  };
+
+  const clearHistory = () => {
+    if (confirm('Clear ALL listing history? This cannot be undone.')) {
+      setListingHistory([]);
+      localStorage.removeItem('handsole-listing-history');
+      setSelectedHistoryItem(null);
+    }
+  };
+
+  const exportAllHistory = () => {
+    const data = JSON.stringify(listingHistory, null, 2);
+    const blob = new Blob([data], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `handsole-all-listings-${Date.now()}.json`;
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -202,6 +274,12 @@ ${listing.keywordsUsed || 'N/A'}
           disabled={!listing}
         >
           📝 Listing
+        </button>
+        <button 
+          className={`tab ${activeTab === 'history' ? 'active' : ''}`}
+          onClick={() => setActiveTab('history')}
+        >
+          📚 History ({listingHistory.length})
         </button>
       </div>
 
@@ -282,30 +360,103 @@ ${listing.keywordsUsed || 'N/A'}
           <div className="listing-section">
             <div className="listing-header">
               <h2>Generated Listing</h2>
-              <button className="download-btn" onClick={downloadListing}>
-                📥 Download All
-              </button>
+              <div className="header-actions">
+                <button className="download-btn" onClick={() => downloadListing()}>
+                  📥 Download
+                </button>
+                <button className="new-btn" onClick={() => { setActiveTab('upload'); setListing(null); setImages([]); setImageBase64s([]); }}>
+                  ➕ New Listing
+                </button>
+              </div>
             </div>
 
-            <ListingCard title="📊 Product Analysis" content={listing.productAnalysis} section="analysis" />
-            <ListingCard title="🎯 Focus Keyword" content={listing.focusKeyword} section="focus" />
-            <ListingCard title="🔑 Supporting Keywords" content={listing.supportingKeywords} section="supporting" />
-            <ListingCard title={`📝 Etsy Title (${listing.title?.length || 0} chars)`} content={listing.title} section="title" />
-            <ListingCard title="🏷️ Etsy 13 Tags" content={listing.tags} section="tags" />
-            <ListingCard title="📄 Description" content={listing.description} section="description" />
-            <ListingCard title="📋 Etsy Attributes" content={listing.attributes} section="attributes" />
-            <ListingCard title="🖼️ Image Alt Texts" content={listing.altTexts} section="alts" />
-            <ListingCard title="📁 Image File Names" content={listing.fileNames} section="files" />
-            <ListingCard title="🔢 SKU" content={listing.sku} section="sku" />
-            <ListingCard title="📂 Shop Category" content={listing.shopCategory} section="category" />
-            <ListingCard title="🎉 Best Occasions" content={listing.occasions} section="occasions" />
-            <ListingCard title="📈 Keywords Used Count" content={listing.keywordsUsed} section="keywords" />
+            {selectedHistoryItem && (
+              <div className="history-notice">
+                Viewing saved listing from {new Date(selectedHistoryItem.date).toLocaleDateString()}
+              </div>
+            )}
+
+            <ListingCard title="📊 1. Product Analysis" content={listing.productAnalysis} section="analysis" />
+            <ListingCard title="🎯 2. Focus Keyword" content={listing.focusKeyword} section="focus" />
+            <ListingCard title="🔑 3. Supporting Keywords" content={listing.supportingKeywords} section="supporting" />
+            <ListingCard title={`📝 4. Etsy Title (${listing.title?.length || 0} chars)`} content={listing.title} section="title" />
+            <ListingCard title="🏷️ 5. Etsy 13 Tags" content={listing.tags} section="tags" />
+            <ListingCard title="📄 6. Description" content={listing.description} section="description" />
+            <ListingCard title="📋 7. Etsy Attributes" content={listing.attributes} section="attributes" />
+            <ListingCard title="🖼️ 8. Image Alt Texts" content={listing.altTexts} section="alts" />
+            <ListingCard title="📁 9. Image File Names" content={listing.fileNames} section="files" />
+            <ListingCard title="🔢 10. SKU" content={listing.sku} section="sku" />
+            <ListingCard title="📂 11. Shop Category" content={listing.shopCategory} section="category" />
+            <ListingCard title="🎉 12. Best Occasions" content={listing.occasions} section="occasions" />
+            <ListingCard title="📈 13. Keywords Used Count" content={listing.keywordsUsed} section="keywords" />
+          </div>
+        )}
+
+        {activeTab === 'history' && (
+          <div className="history-section">
+            <div className="history-header">
+              <h2>📚 Listing History</h2>
+              {listingHistory.length > 0 && (
+                <div className="history-actions">
+                  <button className="export-btn" onClick={exportAllHistory}>
+                    📤 Export All
+                  </button>
+                  <button className="clear-btn" onClick={clearHistory}>
+                    🗑️ Clear All
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {listingHistory.length === 0 ? (
+              <div className="empty-history">
+                <p>No listings generated yet.</p>
+                <p>Upload a product image to create your first listing!</p>
+              </div>
+            ) : (
+              <div className="history-grid">
+                {listingHistory.map((item) => (
+                  <div 
+                    key={item.id} 
+                    className={`history-item ${selectedHistoryItem?.id === item.id ? 'selected' : ''}`}
+                    onClick={() => viewHistoryItem(item)}
+                  >
+                    <div className="history-thumbnail">
+                      <img src={item.thumbnail} alt={item.title} />
+                    </div>
+                    <div className="history-info">
+                      <h4>{item.title?.substring(0, 50) || 'Untitled'}...</h4>
+                      <p className="history-keyword">{item.focusKeyword}</p>
+                      <p className="history-sku">{item.sku}</p>
+                      <p className="history-date">{new Date(item.date).toLocaleDateString()} {new Date(item.date).toLocaleTimeString()}</p>
+                    </div>
+                    <div className="history-actions-item">
+                      <button 
+                        className="download-small-btn" 
+                        onClick={(e) => { e.stopPropagation(); downloadListing(item.listing); }}
+                        title="Download"
+                      >
+                        📥
+                      </button>
+                      <button 
+                        className="delete-btn" 
+                        onClick={(e) => deleteHistoryItem(item.id, e)}
+                        title="Delete"
+                      >
+                        🗑️
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
       </main>
 
       <footer className="footer">
         <p>Handsole Etsy Listing Generator • Powered by Claude AI</p>
+        <p className="footer-note">Listings saved locally in your browser</p>
       </footer>
     </div>
   );
