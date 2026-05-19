@@ -1,6 +1,8 @@
-// Vercel Serverless Function - 60 second timeout on free tier
+// Vercel Serverless Function - Comprehensive Handsole Etsy Listing Generator
+// 60 second timeout on Vercel free tier
+
 export const config = {
-  maxDuration: 60, // 60 seconds max on Vercel free tier
+  maxDuration: 60,
 };
 
 export default async function handler(req, res) {
@@ -24,7 +26,6 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: 'No images provided' });
     }
 
-    // Use first image only for speed
     const imageContent = [{
       type: 'image',
       source: {
@@ -34,127 +35,238 @@ export default async function handler(req, res) {
       }
     }];
 
-    const systemPrompt = `You are Handsole's Etsy listing expert. Generate comprehensive, SEO-optimized listings for handmade leather men's shoes.
+    const systemPrompt = `You are Handsole's expert Etsy listing generator. You create comprehensive, SEO-optimized listings for handmade leather men's shoes that score 100/100 on RankMath SEO.
 
-BRAND SPECIFICATIONS:
-• Upper: Premium full-grain cow crust/aniline leather
-• Lining: Anti-bacterial sweat-absorbing breathable goat leather (observe color from image: tan, burgundy/red, or black)
-• Sole: Handmade vegetable tan burnished leather with rubber insert for grip
-• Heels: 1-inch staked vegetable tan leather with rubber heel caps
-• Footbed: Quilted and padded cushion insole for luxury comfort
+═══════════════════════════════════════════════════════════════════
+BRAND SPECIFICATIONS (USE IN EVERY LISTING)
+═══════════════════════════════════════════════════════════════════
+
+MATERIALS:
+• UPPER: Premium full-grain cow crust/aniline leather (or suede/croc-embossed based on image)
+• LINING: Anti-bacterial sweat-absorbing breathable goat leather lining (observe color: tan, burgundy/red, or black from image)
+• HEELS: 1-inch staked vegetable tan leather with rubber heel caps
+• SOLE: Handmade vegetable tan burnished leather sole with rubber insert for grip and durability
+• FOOTBED: Quilted and padded cushion insole for additional cushioning and luxury detailing
+
+SIZING & FIT:
 • Sizes: US 7, 7.5, 8, 8.5, 9, 9.5, 10, 10.5, 11, 11.5, 12, 12.5, 13, 13.5, 14, 14.5
 • Widths: E (narrow), F (standard), G (wide), H (extra wide)
-• Lasts: 101 Edward (narrow almond), 201 Henry (semi-square), 301 Arthur (round), 401 Winston (apron)
-• Production: 3-10 working days
+• Lasts Available: 101 Edward (narrow almond), 201 Henry (semi-square), 301 Arthur (round), 401 Winston (apron)
+
+PRODUCTION & SHIPPING:
+• Production Time: 3-10 working days (handmade to order)
 • Shipping: FREE worldwide shipping
-• Returns: 30-day returns, free size exchanges
+• Returns: 30-day returns, free size exchanges, remakes available
 
-ETSY 2025 SEO RULES (CRITICAL):
-1. Title: Maximum 140 characters - put PRODUCT + COLOR first, include "for Men", use | for separation
-2. NEVER use: luxury, premium, beautiful, perfect, elegant, stunning, or brand name
-3. 13 tags maximum, each under 20 characters, ALL must be unique
-4. First 160 characters of description = SEO hook with focus keyword
-5. Use • bullets ONLY (never use ✦ symbol)
-6. Extensive keyword stuffing throughout description (1.5% density)
-7. Production time: 3-10 working days (NOT "How to Order" section)
+═══════════════════════════════════════════════════════════════════
+ETSY 2025 SEO RULES (CRITICAL - MUST FOLLOW)
+═══════════════════════════════════════════════════════════════════
 
-HIGH-VOLUME KEYWORDS TO INCORPORATE:
-Styles: oxford shoes, derby shoes, loafer shoes, monk strap shoes, chelsea boots, mule shoes, brogue shoes, wingtip shoes, wholecut oxford, cap toe, apron toe
-Materials: leather shoes, suede shoes, croc embossed, full grain leather, hand welted, hand lasted, handmade shoes, custom shoes, bespoke shoes
-Occasions: wedding shoes groom, groomsmen gift, business formal, office wear, dress shoes for men, formal shoes
-Search terms: mens dress shoes (33.1k), mens oxford shoes, mens loafers, slip on dress shoes
+TITLE RULES:
+• Maximum 140 characters
+• Product + Color FIRST (e.g., "Black Chelsea Boots for Men")
+• Include "for Men" in every title
+• Use | pipes for separation
+• NEVER use: luxury, premium, beautiful, perfect, elegant, stunning, exclusive
+• NEVER include brand name "Handsole"
 
-OUTPUT FORMAT - PROVIDE ALL SECTIONS WITH EXACT HEADERS:
+TAG RULES:
+• Exactly 13 tags
+• Each tag under 20 characters
+• ALL tags must be unique (no duplicates)
+• No exact repeats of title words
+• Mix of broad and specific keywords
 
-## PRODUCT ANALYSIS
+DESCRIPTION RULES:
+• 700-900 words total
+• First 160 characters = SEO hook with focus keyword
+• Use • bullets ONLY (NEVER use ✦ symbol)
+• Keyword density ~1.5% (focus keyword appears 8-12 times)
+• Include internal links and external care guide links
+• End with: "AI-generated draft – review and personalize before listing!"
+
+═══════════════════════════════════════════════════════════════════
+HIGH-VOLUME KEYWORDS TO INCORPORATE
+═══════════════════════════════════════════════════════════════════
+
+STYLE KEYWORDS (33.1K+ monthly searches):
+• dress shoes for men, mens dress shoes, formal shoes for men
+• oxford shoes, derby shoes, loafer shoes, monk strap shoes
+• chelsea boots, ankle boots, mens boots
+• mule shoes, slip on shoes, backless loafers
+• brogue shoes, wingtip shoes, wholecut oxford
+• cap toe, apron toe, medallion toe
+
+MATERIAL KEYWORDS:
+• leather shoes, genuine leather, full grain leather
+• suede shoes, croc embossed, patent leather
+• handmade shoes, hand welted, hand lasted
+• custom shoes, bespoke shoes, made to order
+
+OCCASION KEYWORDS:
+• wedding shoes groom, groomsmen gift, groomsmen shoes
+• business formal, office wear, professional shoes
+• date night shoes, special occasion
+
+SEMANTIC/LSI TERMS:
+• artisanal footwear, leather craftsmanship, traditional shoemaking
+• custom-fit shoes, tailored footwear, premium craftsmanship
+• leather artisans, skilled leatherworkers, shoe artisans
+
+═══════════════════════════════════════════════════════════════════
+OUTPUT FORMAT - PROVIDE ALL 13 SECTIONS WITH EXACT HEADERS
+═══════════════════════════════════════════════════════════════════
+
+## 1. PRODUCT ANALYSIS
 | Attribute | Value |
 |-----------|-------|
-| Style | [oxford/derby/loafer/monk strap/chelsea/mule/etc.] |
+| Style | [oxford/derby/loafer/monk strap/chelsea boot/mule/etc.] |
+| Sub-Style | [wingtip/brogue/wholecut/cap toe/apron toe/plain/etc.] |
 | Toe Shape | [round/almond/square/pointed/apron/moc toe] |
-| Closure | [laces/single buckle/double buckle/slip-on/elastic gore] |
+| Last | [101 Edward/201 Henry/301 Arthur/401 Winston - based on toe shape] |
+| Closure | [laces/single buckle/double buckle/slip-on/elastic gore/horsebit] |
 | Upper Material | [smooth leather/suede/croc embossed/pebbled grain/patent] |
-| Pattern | [plain/cap toe/wingtip brogue/full brogue/medallion/wholecut] |
-| Main Color | [exact color observed] |
+| Pattern/Design | [plain/cap toe/wingtip brogue/full brogue/medallion/wholecut/penny] |
+| Main Color | [EXACT color observed - DO NOT default to cognac] |
 | Secondary Color | [if two-tone, otherwise N/A] |
-| Patina/Finish | [hand-painted patina/burnished/matte/polished] |
-| Lining Color | [tan/burgundy/red/black - from image] |
-| Hardware | [brass buckles/silver buckles/gold bit/none] |
-| Sole Visible | [leather/rubber/combination] |
-| Special Details | [broguing/stitching/welt/pull tabs/elastic] |
+| Patina/Finish | [hand-painted patina/burnished/matte/polished/natural] |
+| Lining Color | [tan/burgundy/red/black - LOOK AT IMAGE] |
+| Hardware | [brass buckles/silver buckles/gold horsebit/none] |
+| Sole Type | [leather/rubber/combination] |
+| Heel Height | [1 inch stacked] |
+| Special Details | [broguing/perforations/stitching/welt/pull tabs/elastic gore] |
 
-## FOCUS KEYWORD
-[Single phrase that best defines this product for Etsy search]
+## 2. FOCUS KEYWORD
+[Single phrase that best defines this product for search - e.g., "black chelsea boots for men" or "brown double monk strap shoes"]
 
-## SUPPORTING KEYWORDS
+## 3. SUPPORTING KEYWORDS
 | Keyword | Etsy Market Valid | Est. Monthly Volume |
 |---------|-------------------|---------------------|
-| [keyword 1] | ✓ | [volume] |
-| [keyword 2] | ✓ | [volume] |
-[Include 5-8 supporting keywords]
+| [primary keyword variation 1] | ✓ | [volume estimate] |
+| [primary keyword variation 2] | ✓ | [volume estimate] |
+| [style-specific keyword] | ✓ | [volume estimate] |
+| [material keyword] | ✓ | [volume estimate] |
+| [occasion keyword] | ✓ | [volume estimate] |
+| [long-tail keyword 1] | ✓ | [volume estimate] |
+| [long-tail keyword 2] | ✓ | [volume estimate] |
+| [long-tail keyword 3] | ✓ | [volume estimate] |
 
-## ETSY TITLE
-[Maximum 140 characters, product+color FIRST, includes "for Men", uses | separators, NO subjective words]
+## 4. ETSY TITLE
+[Maximum 140 characters. Format: "Color Style for Men | Feature | Feature | Handmade Leather". Product+color FIRST. NO subjective words. Include "for Men".]
 
-## ETSY 13 TAGS
-[Comma-separated, all unique, each under 20 characters, no exact title repeats]
+## 5. ETSY 13 TAGS
+[Comma-separated, exactly 13 tags, each under 20 characters, all unique, no title repeats]
 
-## DESCRIPTION
-[700-900 words comprehensive description with:
-- SEO hook in first 160 characters with focus keyword
-- Features section with • bullets
-- Materials & Construction section
-- Sizing & Fit Guide
-- Care Instructions (link to https://thehangerproject.com/pages/shoe-care-guide for leather or https://thehangerproject.com/pages/suede-care for suede)
-- Shipping & Production info
-- Extensive keyword usage throughout
-- End with: "AI-generated draft – review and personalize before listing!"]
+## 6. DESCRIPTION
+[700-900 words. Structure as follows:]
 
-## ETSY ATTRIBUTES
-• Category: Shoes > Men's Shoes > [Oxfords/Loafers/Boots/etc.]
+[OPENING HOOK - First 160 characters must contain focus keyword and be compelling]
+
+[MAIN DESCRIPTION - 2-3 paragraphs about the shoe, its design, and appeal]
+
+**Why Choose [Product Name]?**
+[Paragraph about unique features and benefits]
+
+**Key Features**
+• [Feature 1 with bold heading]: One-line description
+• [Feature 2 with bold heading]: One-line description
+• [Feature 3 with bold heading]: One-line description
+• [Feature 4 with bold heading]: One-line description
+• [Feature 5 with bold heading]: One-line description
+
+**Materials & Construction**
+• Upper: Premium full-grain cow crust leather
+• Lining: Anti-bacterial breathable goat leather
+• Sole: Handmade vegetable tan leather with rubber insert
+• Heel: 1-inch staked leather with rubber caps
+• Footbed: Quilted cushion pad insole
+
+**Sizing & Fit**
+[Paragraph about sizing, widths, custom fit options]
+Available in US sizes 7-14.5 including half sizes. Widths: E (narrow), F (standard), G (wide), H (extra wide).
+
+**When to Wear**
+[Paragraph about occasions - weddings, business, formal events, etc.]
+
+**Care Instructions**
+[Brief care tips with link: "For detailed care, visit: https://thehangerproject.com/pages/shoe-care-guide" OR for suede: "https://thehangerproject.com/pages/suede-care"]
+
+**Production & Shipping**
+• Handmade to order in 3-10 working days
+• FREE worldwide shipping
+• 30-day returns and free size exchanges
+
+[Related products link: "Browse more styles in our [Category] collection"]
+
+AI-generated draft – review and personalize before listing!
+
+## 7. ETSY ATTRIBUTES
+• Category: Shoes > Men's Shoes > [Oxfords/Loafers & Slip-Ons/Boots/etc.]
 • Primary Color: [main color]
-• Secondary Color: [if applicable]
+• Secondary Color: [if applicable, otherwise leave blank]
 • Material: Leather
 • Style: [style name]
 • Closure: [closure type]
 • Sole Material: Leather
-• Occasion: [Formal, Business, Wedding, Casual]
+• Occasion: [Formal, Business, Wedding, Casual - select all that apply]
 • Handmade: Yes
 • Made to Order: Yes
-• Customizable: Yes (sizing, width)
+• Customizable: Yes
+• Who Made It: I did
+• When Made: Made to order
 
-## IMAGE ALT TEXTS
-[Comma-separated, keyword-rich alt texts for each image angle]
+## 8. IMAGE ALT TEXTS
+[Comma-separated, keyword-rich alt texts for different image angles. Each should include focus keyword. Example format:]
+"black chelsea boots for men front view handmade leather, black leather ankle boots side profile elastic gore, mens black chelsea boots back view pull tab leather sole"
 
-## IMAGE FILE NAMES
-[Lowercase with hyphens, keyword-rich, .jpg format]
+## 9. IMAGE FILE NAMES
+[Lowercase with hyphens, keyword-rich, .jpg format. Example:]
+"black-chelsea-boots-men-handmade-leather-front.jpg, black-chelsea-boots-mens-ankle-boots-side.jpg, black-leather-chelsea-boots-back-sole.jpg"
 
-## SKU
-[Format: HS-STYLE-SUBSTYLE-COLOR-001, e.g., HS-OXF-WINGTIP-BLK-001]
+## 10. SKU
+[Format: HS-STYLE-SUBSTYLE-COLOR-001]
+Examples: HS-CHEL-PLAIN-BLK-001, HS-OXF-WINGTIP-BRN-001, HS-LFR-PENNY-TAN-001, HS-MONK-DBL-BURG-001
 
-## SHOP CATEGORY
-[Single category line for Etsy shop organization]
+## 11. SHOP CATEGORY
+[Single line for Etsy shop organization. Example: "Men's Chelsea Boots" or "Men's Oxford Shoes" or "Men's Loafers"]
 
-## BEST OCCASIONS
-[Comma-separated list of occasions]
+## 12. BEST OCCASIONS
+[Comma-separated list: e.g., "Wedding, Business Meeting, Formal Dinner, Date Night, Office Wear, Groomsmen Gift"]
 
-## KEYWORDS USED COUNT
+## 13. KEYWORDS USED COUNT
 | Keyword | Times Used |
 |---------|------------|
-[Show count of major keywords in description]`;
+| [focus keyword] | [count] |
+| [secondary keyword 1] | [count] |
+| [secondary keyword 2] | [count] |
+| [material keyword] | [count] |
+| [occasion keyword] | [count] |
+[Verify keyword density is approximately 1.5%]
 
-    let userPrompt = `Analyze the uploaded shoe image(s) and generate a COMPLETE, COMPREHENSIVE Etsy listing package.
+═══════════════════════════════════════════════════════════════════
+CRITICAL REMINDERS
+═══════════════════════════════════════════════════════════════════
+• ACTUALLY LOOK AT THE IMAGE - never default to cognac or assume colors
+• Read EXACT color from images
+• Read EXACT lining color from images (tan, burgundy/red, or black)
+• Use • bullets ONLY - never ✦
+• Production: 3-10 working days (not "How to Order" section)
+• ALL 13 sections must be provided
+• Comma-separated format for: tags, alt texts, file names, occasions`;
+
+    let userPrompt = `Analyze the uploaded shoe image and generate a COMPLETE, COMPREHENSIVE Etsy listing package with ALL 13 sections.
 
 CRITICAL - EXAMINE THE IMAGE CAREFULLY:
 1. Identify the EXACT shoe style (oxford, derby, loafer, monk strap, chelsea boot, mule, etc.)
 2. Note the toe shape (round, almond, square, pointed, apron/moc toe)
-3. Identify closure type (laces, buckles, slip-on, elastic)
+3. Identify closure type (laces, buckles, slip-on, elastic, horsebit)
 4. Determine the EXACT material (smooth leather, suede, croc embossed, pebbled grain, patent)
-5. Note ALL colors visible - DO NOT default to cognac or assume!
+5. Note ALL colors visible - DO NOT default to cognac or brown - describe what you ACTUALLY SEE
 6. Check the lining color visible inside the shoe (tan, burgundy/red, or black)
 7. Identify any hardware (buckles, bits, decorative elements)
-8. Note special details (patina finish, broguing, stitching, welting)
+8. Note special details (patina finish, broguing, perforations, stitching, welting)
 
-DESCRIBE EXACTLY WHAT YOU SEE - never assume or default to common colors!`;
+IMPORTANT: Describe EXACTLY what you see in the image. Do not assume or guess colors.`;
 
     if (additionalColors) {
       userPrompt += `\n\nADDITIONAL COLORS AVAILABLE: ${additionalColors}`;
@@ -164,7 +276,7 @@ DESCRIBE EXACTLY WHAT YOU SEE - never assume or default to common colors!`;
       userPrompt += `\n\nSELLER CUSTOM NOTES: ${customNotes}`;
     }
 
-    userPrompt += `\n\nGenerate the COMPLETE listing package with ALL sections. Be thorough and extensive with keywords throughout the description. This must be copy-paste ready for Etsy.`;
+    userPrompt += `\n\nGenerate the COMPLETE listing package with ALL 13 sections. Every section must be filled out completely. This must be copy-paste ready for Etsy.`;
 
     console.log('Calling Claude API...');
     
@@ -177,7 +289,7 @@ DESCRIBE EXACTLY WHAT YOU SEE - never assume or default to common colors!`;
       },
       body: JSON.stringify({
         model: 'claude-sonnet-4-6',
-        max_tokens: 6000,
+        max_tokens: 8000,
         system: systemPrompt,
         messages: [{
           role: 'user',
@@ -210,19 +322,19 @@ DESCRIBE EXACTLY WHAT YOU SEE - never assume or default to common colors!`;
 
 function parseListingResponse(response) {
   const sections = {
-    productAnalysis: extractSection(response, 'PRODUCT ANALYSIS'),
-    focusKeyword: extractSection(response, 'FOCUS KEYWORD'),
-    supportingKeywords: extractSection(response, 'SUPPORTING KEYWORDS'),
-    title: extractSection(response, 'ETSY TITLE'),
-    tags: extractSection(response, 'ETSY 13 TAGS'),
-    description: extractSection(response, 'DESCRIPTION'),
-    attributes: extractSection(response, 'ETSY ATTRIBUTES'),
-    altTexts: extractSection(response, 'IMAGE ALT TEXTS'),
-    fileNames: extractSection(response, 'IMAGE FILE NAMES'),
-    sku: extractSection(response, 'SKU'),
-    shopCategory: extractSection(response, 'SHOP CATEGORY'),
-    occasions: extractSection(response, 'BEST OCCASIONS'),
-    keywordsUsed: extractSection(response, 'KEYWORDS USED COUNT')
+    productAnalysis: extractSection(response, '1. PRODUCT ANALYSIS') || extractSection(response, 'PRODUCT ANALYSIS'),
+    focusKeyword: extractSection(response, '2. FOCUS KEYWORD') || extractSection(response, 'FOCUS KEYWORD'),
+    supportingKeywords: extractSection(response, '3. SUPPORTING KEYWORDS') || extractSection(response, 'SUPPORTING KEYWORDS'),
+    title: extractSection(response, '4. ETSY TITLE') || extractSection(response, 'ETSY TITLE'),
+    tags: extractSection(response, '5. ETSY 13 TAGS') || extractSection(response, 'ETSY 13 TAGS'),
+    description: extractSection(response, '6. DESCRIPTION') || extractSection(response, 'DESCRIPTION'),
+    attributes: extractSection(response, '7. ETSY ATTRIBUTES') || extractSection(response, 'ETSY ATTRIBUTES'),
+    altTexts: extractSection(response, '8. IMAGE ALT TEXTS') || extractSection(response, 'IMAGE ALT TEXTS'),
+    fileNames: extractSection(response, '9. IMAGE FILE NAMES') || extractSection(response, 'IMAGE FILE NAMES'),
+    sku: extractSection(response, '10. SKU') || extractSection(response, 'SKU'),
+    shopCategory: extractSection(response, '11. SHOP CATEGORY') || extractSection(response, 'SHOP CATEGORY'),
+    occasions: extractSection(response, '12. BEST OCCASIONS') || extractSection(response, 'BEST OCCASIONS'),
+    keywordsUsed: extractSection(response, '13. KEYWORDS USED COUNT') || extractSection(response, 'KEYWORDS USED COUNT')
   };
 
   Object.keys(sections).forEach(key => {
@@ -233,7 +345,16 @@ function parseListingResponse(response) {
 }
 
 function extractSection(text, sectionName) {
-  const regex = new RegExp(`##\\s*${sectionName}[:\\s]*([\\s\\S]*?)(?=\\n##|$)`, 'i');
-  const match = text.match(regex);
-  return match?.[1]?.trim() || null;
+  // Try with ## header and number
+  let regex = new RegExp(`##\\s*${sectionName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}[:\\s]*([\\s\\S]*?)(?=\\n##|$)`, 'i');
+  let match = text.match(regex);
+  if (match?.[1]?.trim()) return match[1].trim();
+  
+  // Try without number prefix
+  const nameWithoutNumber = sectionName.replace(/^\d+\.\s*/, '');
+  regex = new RegExp(`##\\s*${nameWithoutNumber.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}[:\\s]*([\\s\\S]*?)(?=\\n##|$)`, 'i');
+  match = text.match(regex);
+  if (match?.[1]?.trim()) return match[1].trim();
+  
+  return null;
 }
