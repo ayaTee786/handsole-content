@@ -1,7 +1,17 @@
 import { useState, useCallback, useEffect } from 'react';
+import { supabase } from './supabaseClient';
 import './App.css';
 
 function App() {
+  // Auth state
+  const [session, setSession] = useState(null);
+  const [authLoading, setAuthLoading] = useState(true);
+  const [authMode, setAuthMode] = useState('signin'); // signin or signup
+  const [authEmail, setAuthEmail] = useState('');
+  const [authPassword, setAuthPassword] = useState('');
+  const [authError, setAuthError] = useState(null);
+
+  // App state
   const [images, setImages] = useState([]);
   const [imageBase64s, setImageBase64s] = useState([]);
   const [productDetails, setProductDetails] = useState({
@@ -11,29 +21,86 @@ function App() {
   const [listing, setListing] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-  const [activeTab, setActiveTab] = useState('upload');
+  const [activeTab, setActiveTab] = useState('generate');
   const [copiedSection, setCopiedSection] = useState(null);
-  const [listingHistory, setListingHistory] = useState([]);
-  const [selectedHistoryItem, setSelectedHistoryItem] = useState(null);
+  const [listings, setListings] = useState([]);
+  const [listingsLoading, setListingsLoading] = useState(false);
+  const [selectedListing, setSelectedListing] = useState(null);
 
-  // Load history from localStorage on mount
+  // Check auth session on mount
   useEffect(() => {
-    const saved = localStorage.getItem('handsole-listing-history');
-    if (saved) {
-      try {
-        setListingHistory(JSON.parse(saved));
-      } catch (e) {
-        console.error('Failed to load history:', e);
-      }
-    }
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session);
+      setAuthLoading(false);
+    });
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session);
+    });
+
+    return () => subscription.unsubscribe();
   }, []);
 
-  // Save history to localStorage whenever it changes
+  // Fetch listings when authenticated
   useEffect(() => {
-    if (listingHistory.length > 0) {
-      localStorage.setItem('handsole-listing-history', JSON.stringify(listingHistory));
+    if (session) {
+      fetchListings();
     }
-  }, [listingHistory]);
+  }, [session]);
+
+  const fetchListings = async () => {
+    setListingsLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from('listings')
+        .select('*')
+        .eq('user_id', session.user.id)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      setListings(data || []);
+    } catch (err) {
+      console.error('Error fetching listings:', err);
+    } finally {
+      setListingsLoading(false);
+    }
+  };
+
+  const handleSignIn = async (e) => {
+    e.preventDefault();
+    setAuthError(null);
+    try {
+      const { error } = await supabase.auth.signInWithPassword({
+        email: authEmail,
+        password: authPassword,
+      });
+      if (error) throw error;
+    } catch (err) {
+      setAuthError(err.message);
+    }
+  };
+
+  const handleSignUp = async (e) => {
+    e.preventDefault();
+    setAuthError(null);
+    try {
+      const { error } = await supabase.auth.signUp({
+        email: authEmail,
+        password: authPassword,
+      });
+      if (error) throw error;
+      setAuthError('Check your email for confirmation link!');
+    } catch (err) {
+      setAuthError(err.message);
+    }
+  };
+
+  const handleSignOut = async () => {
+    await supabase.auth.signOut();
+    setListings([]);
+    setListing(null);
+    setSelectedListing(null);
+  };
 
   const handleImageUpload = useCallback((e) => {
     const files = Array.from(e.target.files || e.dataTransfer?.files || []);
@@ -95,28 +162,84 @@ function App() {
 
       const data = await response.json();
       setListing(data);
-      
-      // Save to history with thumbnail
-      const historyItem = {
-        id: Date.now(),
-        date: new Date().toISOString(),
-        thumbnail: `data:image/jpeg;base64,${imageBase64s[0]}`,
-        title: data.title || 'Untitled Listing',
-        focusKeyword: data.focusKeyword || '',
-        sku: data.sku || '',
-        listing: data
-      };
-      
-      setListingHistory(prev => [historyItem, ...prev]);
-      setActiveTab('listing');
+
+      // Save to Supabase
+      const { error: insertError } = await supabase
+        .from('listings')
+        .insert({
+          user_id: session.user.id,
+          thumbnail: imageBase64s[0].substring(0, 50000), // Limit size
+          title: data.title || 'Untitled',
+          focus_keyword: data.focusKeyword || '',
+          sku: data.sku || '',
+          product_analysis: data.productAnalysis || '',
+          supporting_keywords: data.supportingKeywords || '',
+          tags: data.tags || '',
+          description: data.description || '',
+          attributes: data.attributes || '',
+          alt_texts: data.altTexts || '',
+          file_names: data.fileNames || '',
+          shop_category: data.shopCategory || '',
+          occasions: data.occasions || '',
+          keywords_used: data.keywordsUsed || ''
+        });
+
+      if (insertError) {
+        console.error('Error saving listing:', insertError);
+      } else {
+        fetchListings(); // Refresh the list
+      }
+
+      setActiveTab('result');
     } catch (err) {
       if (err.name === 'AbortError') {
-        setError('Request timed out. Please try with a smaller image.');
+        setError('Request timed out. Please try again.');
       } else {
-        setError(err.message || 'An error occurred while generating the listing');
+        setError(err.message || 'An error occurred');
       }
     } finally {
       setLoading(false);
+    }
+  };
+
+  const viewListing = (item) => {
+    setSelectedListing(item);
+    setListing({
+      productAnalysis: item.product_analysis,
+      focusKeyword: item.focus_keyword,
+      supportingKeywords: item.supporting_keywords,
+      title: item.title,
+      tags: item.tags,
+      description: item.description,
+      attributes: item.attributes,
+      altTexts: item.alt_texts,
+      fileNames: item.file_names,
+      sku: item.sku,
+      shopCategory: item.shop_category,
+      occasions: item.occasions,
+      keywordsUsed: item.keywords_used
+    });
+    setActiveTab('result');
+  };
+
+  const deleteListing = async (id, e) => {
+    e.stopPropagation();
+    if (!confirm('Delete this listing?')) return;
+
+    try {
+      const { error } = await supabase
+        .from('listings')
+        .delete()
+        .eq('id', id);
+
+      if (error) throw error;
+      setListings(prev => prev.filter(item => item.id !== id));
+      if (selectedListing?.id === id) {
+        setSelectedListing(null);
+        setListing(null);
+      }
+    } catch (err) {
+      console.error('Error deleting:', err);
     }
   };
 
@@ -130,109 +253,56 @@ function App() {
     }
   };
 
-  const downloadListing = (listingData = listing) => {
-    if (!listingData) return;
-
-    const content = `
-HANDSOLE ETSY LISTING PACKAGE
+  const downloadListing = () => {
+    if (!listing) return;
+    const content = `HANDSOLE ETSY LISTING
 Generated: ${new Date().toLocaleString()}
-=============================
+================================
 
 1. PRODUCT ANALYSIS
--------------------
-${listingData.productAnalysis || 'N/A'}
+${listing.productAnalysis || 'N/A'}
 
 2. FOCUS KEYWORD
-----------------
-${listingData.focusKeyword || 'N/A'}
+${listing.focusKeyword || 'N/A'}
 
 3. SUPPORTING KEYWORDS
-----------------------
-${listingData.supportingKeywords || 'N/A'}
+${listing.supportingKeywords || 'N/A'}
 
-4. ETSY TITLE (${listingData.title?.length || 0} chars)
---------------
-${listingData.title || 'N/A'}
+4. ETSY TITLE
+${listing.title || 'N/A'}
 
 5. ETSY 13 TAGS
----------------
-${listingData.tags || 'N/A'}
+${listing.tags || 'N/A'}
 
 6. DESCRIPTION
---------------
-${listingData.description || 'N/A'}
+${listing.description || 'N/A'}
 
 7. ETSY ATTRIBUTES
-------------------
-${listingData.attributes || 'N/A'}
+${listing.attributes || 'N/A'}
 
 8. IMAGE ALT TEXTS
-------------------
-${listingData.altTexts || 'N/A'}
+${listing.altTexts || 'N/A'}
 
 9. IMAGE FILE NAMES
--------------------
-${listingData.fileNames || 'N/A'}
+${listing.fileNames || 'N/A'}
 
 10. SKU
--------
-${listingData.sku || 'N/A'}
+${listing.sku || 'N/A'}
 
 11. SHOP CATEGORY
------------------
-${listingData.shopCategory || 'N/A'}
+${listing.shopCategory || 'N/A'}
 
 12. BEST OCCASIONS
-------------------
-${listingData.occasions || 'N/A'}
+${listing.occasions || 'N/A'}
 
-13. KEYWORDS USED COUNT
------------------------
-${listingData.keywordsUsed || 'N/A'}
+13. KEYWORDS USED
+${listing.keywordsUsed || 'N/A'}
 `;
-
     const blob = new Blob([content], { type: 'text/plain' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    const sku = listingData.sku?.replace(/[^a-zA-Z0-9-]/g, '') || 'listing';
-    a.download = `handsole-${sku}-${Date.now()}.txt`;
-    a.click();
-    URL.revokeObjectURL(url);
-  };
-
-  const viewHistoryItem = (item) => {
-    setSelectedHistoryItem(item);
-    setListing(item.listing);
-    setActiveTab('listing');
-  };
-
-  const deleteHistoryItem = (id, e) => {
-    e.stopPropagation();
-    if (confirm('Delete this listing from history?')) {
-      setListingHistory(prev => prev.filter(item => item.id !== id));
-      if (selectedHistoryItem?.id === id) {
-        setSelectedHistoryItem(null);
-        setListing(null);
-      }
-    }
-  };
-
-  const clearHistory = () => {
-    if (confirm('Clear ALL listing history? This cannot be undone.')) {
-      setListingHistory([]);
-      localStorage.removeItem('handsole-listing-history');
-      setSelectedHistoryItem(null);
-    }
-  };
-
-  const exportAllHistory = () => {
-    const data = JSON.stringify(listingHistory, null, 2);
-    const blob = new Blob([data], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `handsole-all-listings-${Date.now()}.json`;
+    a.download = `handsole-${listing.sku || 'listing'}-${Date.now()}.txt`;
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -241,7 +311,7 @@ ${listingData.keywordsUsed || 'N/A'}
     <div className="listing-card">
       <div className="card-header">
         <h3>{title}</h3>
-        <button 
+        <button
           className={`copy-btn ${copiedSection === section ? 'copied' : ''}`}
           onClick={() => copyToClipboard(content, section)}
         >
@@ -254,92 +324,170 @@ ${listingData.keywordsUsed || 'N/A'}
     </div>
   );
 
+  // Auth loading
+  if (authLoading) {
+    return (
+      <div className="auth-loading">
+        <div className="spinner-large"></div>
+      </div>
+    );
+  }
+
+  // Auth screen
+  if (!session) {
+    return (
+      <div className="auth-container">
+        <div className="auth-box">
+          <div className="auth-header">
+            <h1>HAND<span>SOLE</span></h1>
+            <p>Etsy Listing Generator</p>
+          </div>
+
+          <div className="auth-tabs">
+            <button
+              className={authMode === 'signin' ? 'active' : ''}
+              onClick={() => setAuthMode('signin')}
+            >
+              Sign In
+            </button>
+            <button
+              className={authMode === 'signup' ? 'active' : ''}
+              onClick={() => setAuthMode('signup')}
+            >
+              Sign Up
+            </button>
+          </div>
+
+          <form onSubmit={authMode === 'signin' ? handleSignIn : handleSignUp}>
+            <div className="auth-field">
+              <label>Email</label>
+              <input
+                type="email"
+                value={authEmail}
+                onChange={(e) => setAuthEmail(e.target.value)}
+                placeholder="you@example.com"
+                required
+              />
+            </div>
+            <div className="auth-field">
+              <label>Password</label>
+              <input
+                type="password"
+                value={authPassword}
+                onChange={(e) => setAuthPassword(e.target.value)}
+                placeholder="••••••••"
+                required
+                minLength={6}
+              />
+            </div>
+            {authError && <div className="auth-error">{authError}</div>}
+            <button type="submit" className="auth-submit">
+              {authMode === 'signin' ? 'Sign In' : 'Create Account'}
+            </button>
+          </form>
+        </div>
+      </div>
+    );
+  }
+
+  // Main app
   return (
     <div className="app">
       <header className="header">
-        <h1>HAND<span>SOLE</span></h1>
-        <p>Etsy Listing Generator</p>
+        <div className="header-left">
+          <h1>HAND<span>SOLE</span></h1>
+        </div>
+        <div className="header-right">
+          <span className="user-email">{session.user.email}</span>
+          <button className="sign-out-btn" onClick={handleSignOut}>Sign Out</button>
+        </div>
       </header>
 
-      <div className="tabs">
-        <button 
-          className={`tab ${activeTab === 'upload' ? 'active' : ''}`}
-          onClick={() => setActiveTab('upload')}
+      <nav className="nav">
+        <button
+          className={activeTab === 'generate' ? 'active' : ''}
+          onClick={() => { setActiveTab('generate'); setSelectedListing(null); }}
         >
-          Upload
+          Generate
         </button>
-        <button 
-          className={`tab ${activeTab === 'listing' ? 'active' : ''}`}
-          onClick={() => setActiveTab('listing')}
+        <button
+          className={activeTab === 'result' ? 'active' : ''}
+          onClick={() => setActiveTab('result')}
           disabled={!listing}
         >
-          Listing
+          Result
         </button>
-        <button 
-          className={`tab ${activeTab === 'history' ? 'active' : ''}`}
-          onClick={() => setActiveTab('history')}
+        <button
+          className={activeTab === 'listings' ? 'active' : ''}
+          onClick={() => setActiveTab('listings')}
         >
-          History ({listingHistory.length})
+          All Listings ({listings.length})
         </button>
-      </div>
+      </nav>
 
       <main className="main">
-        {activeTab === 'upload' && (
-          <div className="upload-section">
-            <div 
-              className="dropzone"
-              onDrop={(e) => { e.preventDefault(); handleImageUpload(e); }}
-              onDragOver={(e) => e.preventDefault()}
-              onClick={() => document.getElementById('file-input').click()}
-            >
-              <input
-                id="file-input"
-                type="file"
-                accept="image/*"
-                multiple
-                onChange={handleImageUpload}
-                style={{ display: 'none' }}
-              />
-              <p>Drop product images here or click to upload</p>
-              <span>Use clear, well-lit photos for best results</span>
+        {activeTab === 'generate' && (
+          <div className="generate-section">
+            <div className="section-header">
+              <h2>Generate New Listing</h2>
             </div>
 
-            {images.length > 0 && (
-              <div className="image-preview">
-                {images.map((img, index) => (
-                  <div key={index} className="preview-item">
-                    <img src={img} alt={`Product ${index + 1}`} />
-                    <button className="remove-btn" onClick={() => removeImage(index)}>×</button>
-                    <span className="image-number">{index + 1}</span>
-                  </div>
-                ))}
+            <div className="upload-area">
+              <div
+                className="dropzone"
+                onDrop={(e) => { e.preventDefault(); handleImageUpload(e); }}
+                onDragOver={(e) => e.preventDefault()}
+                onClick={() => document.getElementById('file-input').click()}
+              >
+                <input
+                  id="file-input"
+                  type="file"
+                  accept="image/*"
+                  multiple
+                  onChange={handleImageUpload}
+                  style={{ display: 'none' }}
+                />
+                <div className="dropzone-icon">+</div>
+                <p>Drop product images here or click to upload</p>
+                <span>Use clear, well-lit photos</span>
               </div>
-            )}
 
-            <div className="options-section">
-              <h3>Options</h3>
-              <div className="form-group">
-                <label>Additional Colors Available</label>
+              {images.length > 0 && (
+                <div className="image-grid">
+                  {images.map((img, index) => (
+                    <div key={index} className="image-item">
+                      <img src={img} alt={`Product ${index + 1}`} />
+                      <button className="remove-btn" onClick={() => removeImage(index)}>×</button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="options-grid">
+              <div className="option-field">
+                <label>Additional Colors</label>
                 <input
                   type="text"
-                  placeholder="e.g., Navy Blue, Burgundy, Tan"
+                  placeholder="Navy Blue, Burgundy, Tan..."
                   value={productDetails.additionalColors}
                   onChange={(e) => setProductDetails(prev => ({ ...prev, additionalColors: e.target.value }))}
                 />
               </div>
-              <div className="form-group">
+              <div className="option-field">
                 <label>Custom Notes</label>
-                <textarea
-                  placeholder="Any specific details about this product..."
+                <input
+                  type="text"
+                  placeholder="Any specific details..."
                   value={productDetails.customNotes}
                   onChange={(e) => setProductDetails(prev => ({ ...prev, customNotes: e.target.value }))}
                 />
               </div>
             </div>
 
-            {error && <div className="error-message">{error}</div>}
+            {error && <div className="error-msg">{error}</div>}
 
-            <button 
+            <button
               className="generate-btn"
               onClick={generateListing}
               disabled={loading || images.length === 0}
@@ -356,98 +504,82 @@ ${listingData.keywordsUsed || 'N/A'}
           </div>
         )}
 
-        {activeTab === 'listing' && listing && (
-          <div className="listing-section">
-            <div className="listing-header">
-              <h2>Generated Listing</h2>
-              <div className="header-actions">
-                <button className="download-btn" onClick={() => downloadListing()}>
-                  Download
-                </button>
-                <button className="new-btn" onClick={() => { setActiveTab('upload'); setListing(null); setImages([]); setImageBase64s([]); setSelectedHistoryItem(null); }}>
+        {activeTab === 'result' && listing && (
+          <div className="result-section">
+            <div className="section-header">
+              <h2>
+                {selectedListing ? 'Viewing Saved Listing' : 'Generated Listing'}
+              </h2>
+              <div className="section-actions">
+                <button className="action-btn" onClick={downloadListing}>Download</button>
+                <button className="action-btn primary" onClick={() => { setActiveTab('generate'); setListing(null); setSelectedListing(null); setImages([]); setImageBase64s([]); }}>
                   New Listing
                 </button>
               </div>
             </div>
 
-            {selectedHistoryItem && (
-              <div className="history-notice">
-                Viewing saved listing from {new Date(selectedHistoryItem.date).toLocaleDateString()}
-              </div>
-            )}
-
-            <ListingCard title="1. Product Analysis" content={listing.productAnalysis} section="analysis" />
-            <ListingCard title="2. Focus Keyword" content={listing.focusKeyword} section="focus" />
-            <ListingCard title="3. Supporting Keywords" content={listing.supportingKeywords} section="supporting" />
-            <ListingCard title={`4. Etsy Title (${listing.title?.length || 0} chars)`} content={listing.title} section="title" />
-            <ListingCard title="5. Etsy 13 Tags" content={listing.tags} section="tags" />
-            <ListingCard title="6. Description" content={listing.description} section="description" />
-            <ListingCard title="7. Etsy Attributes" content={listing.attributes} section="attributes" />
-            <ListingCard title="8. Image Alt Texts" content={listing.altTexts} section="alts" />
-            <ListingCard title="9. Image File Names" content={listing.fileNames} section="files" />
-            <ListingCard title="10. SKU" content={listing.sku} section="sku" />
-            <ListingCard title="11. Shop Category" content={listing.shopCategory} section="category" />
-            <ListingCard title="12. Best Occasions" content={listing.occasions} section="occasions" />
-            <ListingCard title="13. Keywords Used Count" content={listing.keywordsUsed} section="keywords" />
+            <div className="cards-grid">
+              <ListingCard title="1. Product Analysis" content={listing.productAnalysis} section="analysis" />
+              <ListingCard title="2. Focus Keyword" content={listing.focusKeyword} section="focus" />
+              <ListingCard title="3. Supporting Keywords" content={listing.supportingKeywords} section="supporting" />
+              <ListingCard title={`4. Title (${listing.title?.length || 0} chars)`} content={listing.title} section="title" />
+              <ListingCard title="5. Tags" content={listing.tags} section="tags" />
+              <ListingCard title="6. Description" content={listing.description} section="description" />
+              <ListingCard title="7. Attributes" content={listing.attributes} section="attributes" />
+              <ListingCard title="8. Alt Texts" content={listing.altTexts} section="alts" />
+              <ListingCard title="9. File Names" content={listing.fileNames} section="files" />
+              <ListingCard title="10. SKU" content={listing.sku} section="sku" />
+              <ListingCard title="11. Category" content={listing.shopCategory} section="category" />
+              <ListingCard title="12. Occasions" content={listing.occasions} section="occasions" />
+              <ListingCard title="13. Keywords Count" content={listing.keywordsUsed} section="keywords" />
+            </div>
           </div>
         )}
 
-        {activeTab === 'history' && (
-          <div className="history-section">
-            <div className="history-header">
-              <h2>Listing History</h2>
-              {listingHistory.length > 0 && (
-                <div className="history-actions">
-                  <button className="export-btn" onClick={exportAllHistory}>
-                    Export All
-                  </button>
-                  <button className="clear-btn" onClick={clearHistory}>
-                    Clear All
-                  </button>
-                </div>
-              )}
+        {activeTab === 'listings' && (
+          <div className="listings-section">
+            <div className="section-header">
+              <h2>All Listings</h2>
+              <span className="listing-count">{listings.length} listings</span>
             </div>
 
-            {listingHistory.length === 0 ? (
-              <div className="empty-history">
-                <p>No listings generated yet.</p>
-                <p>Upload a product image to create your first listing.</p>
+            {listingsLoading ? (
+              <div className="loading-state">
+                <div className="spinner"></div>
+                <p>Loading listings...</p>
+              </div>
+            ) : listings.length === 0 ? (
+              <div className="empty-state">
+                <p>No listings yet</p>
+                <button onClick={() => setActiveTab('generate')}>Generate your first listing</button>
               </div>
             ) : (
-              <div className="history-grid">
-                {listingHistory.map((item) => (
-                  <div 
-                    key={item.id} 
-                    className={`history-item ${selectedHistoryItem?.id === item.id ? 'selected' : ''}`}
-                    onClick={() => viewHistoryItem(item)}
-                  >
-                    <div className="history-thumbnail">
-                      <img src={item.thumbnail} alt={item.title} />
-                    </div>
-                    <div className="history-info">
-                      <h4>{item.title?.substring(0, 50) || 'Untitled'}...</h4>
-                      <p className="history-keyword">{item.focusKeyword}</p>
-                      <p className="history-sku">{item.sku}</p>
-                      <p className="history-date">{new Date(item.date).toLocaleDateString()} {new Date(item.date).toLocaleTimeString()}</p>
-                    </div>
-                    <div className="history-actions-item">
-                      <button 
-                        className="download-small-btn" 
-                        onClick={(e) => { e.stopPropagation(); downloadListing(item.listing); }}
-                        title="Download"
-                      >
-                        ↓
-                      </button>
-                      <button 
-                        className="delete-btn" 
-                        onClick={(e) => deleteHistoryItem(item.id, e)}
-                        title="Delete"
-                      >
-                        ×
-                      </button>
-                    </div>
-                  </div>
-                ))}
+              <div className="data-table">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Date</th>
+                      <th>Title</th>
+                      <th>Focus Keyword</th>
+                      <th>SKU</th>
+                      <th>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {listings.map((item) => (
+                      <tr key={item.id} onClick={() => viewListing(item)}>
+                        <td>{new Date(item.created_at).toLocaleDateString()}</td>
+                        <td className="title-cell">{item.title?.substring(0, 60)}...</td>
+                        <td>{item.focus_keyword}</td>
+                        <td className="sku-cell">{item.sku}</td>
+                        <td className="actions-cell">
+                          <button className="view-btn" onClick={(e) => { e.stopPropagation(); viewListing(item); }}>View</button>
+                          <button className="delete-btn" onClick={(e) => deleteListing(item.id, e)}>Delete</button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
             )}
           </div>
@@ -456,7 +588,6 @@ ${listingData.keywordsUsed || 'N/A'}
 
       <footer className="footer">
         <p>Handsole Content Generator</p>
-        <p className="footer-note">Listings saved locally in browser</p>
       </footer>
     </div>
   );
