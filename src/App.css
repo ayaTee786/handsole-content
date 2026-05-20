@@ -1,4 +1,4 @@
- * {
+* {
   margin: 0;
   padding: 0;
   box-sizing: border-box;
@@ -162,11 +162,34 @@ body {
   background: var(--yellow-hover);
 }
 
+/* Remember Me */
+.remember-me {
+  margin-bottom: 16px;
+}
+
+.remember-me label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.85rem;
+  color: var(--light-gray);
+  cursor: pointer;
+  user-select: none;
+}
+
+.remember-me input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--yellow);
+  cursor: pointer;
+}
+
 /* Main App */
 .app {
   min-height: 100vh;
   display: flex;
   flex-direction: column;
+  background: #ffffff;
 }
 
 /* Header */
@@ -175,14 +198,15 @@ body {
   justify-content: space-between;
   align-items: center;
   padding: 16px 32px;
-  background: var(--dark);
-  border-bottom: 1px solid var(--border);
+  background: #ffffff;
+  border-bottom: 1px solid #e0e0e0;
 }
 
 .header-left h1 {
   font-size: 1.4rem;
   font-weight: 700;
   letter-spacing: 1px;
+  color: #111111;
 }
 
 .header-left h1 span {
@@ -196,24 +220,23 @@ body {
 }
 
 .user-email {
-  color: var(--light-gray);
+  color: #555555;
   font-size: 0.85rem;
 }
 
 .sign-out-btn {
   padding: 8px 16px;
-  border: 1px solid var(--border);
+  border: 1px solid #cccccc;
   border-radius: 6px;
   background: transparent;
-  color: var(--white);
+  color: #111111;
   font-size: 0.85rem;
   cursor: pointer;
   transition: all 0.2s;
 }
 
 .sign-out-btn:hover {
-  background: var(--medium-gray);
-  border-color: var(--light-gray);
+  background: #f0f0f0;
 }
 
 /* Nav */
@@ -221,15 +244,15 @@ body {
   display: flex;
   gap: 0;
   padding: 0 32px;
-  background: var(--dark);
-  border-bottom: 1px solid var(--border);
+  background: #ffffff;
+  border-bottom: 1px solid #e0e0e0;
 }
 
 .nav button {
   padding: 16px 24px;
   border: none;
   background: transparent;
-  color: var(--light-gray);
+  color: #777777;
   font-size: 0.9rem;
   font-weight: 500;
   cursor: pointer;
@@ -238,7 +261,7 @@ body {
 }
 
 .nav button:hover:not(:disabled) {
-  color: var(--white);
+  color: #111111;
 }
 
 .nav button.active {
@@ -255,7 +278,7 @@ body {
 .main {
   flex: 1;
   padding: 32px;
-  background: var(--black);
+  background: #f7f7f7;
 }
 
 /* Section Header */
@@ -269,6 +292,7 @@ body {
 .section-header h2 {
   font-size: 1.3rem;
   font-weight: 600;
+  color: #111111;
 }
 
 .section-actions {
@@ -278,17 +302,17 @@ body {
 
 .action-btn {
   padding: 10px 20px;
-  border: 1px solid var(--border);
+  border: 1px solid #cccccc;
   border-radius: 6px;
   background: transparent;
-  color: var(--white);
+  color: #111111;
   font-size: 0.9rem;
   cursor: pointer;
   transition: all 0.2s;
 }
 
 .action-btn:hover {
-  background: var(--medium-gray);
+  background: #f0f0f0;
 }
 
 .action-btn.primary {
@@ -301,6 +325,33 @@ body {
   background: var(--yellow-hover);
 }
 
+/* Gender Toggle */
+.gender-toggle {
+  display: flex;
+  background: #f0f0f0;
+  border-radius: 8px;
+  padding: 4px;
+  gap: 0;
+}
+
+.gender-toggle button {
+  padding: 8px 20px;
+  border: none;
+  background: transparent;
+  color: #777777;
+  font-size: 0.85rem;
+  font-weight: 500;
+  cursor: pointer;
+  border-radius: 6px;
+  transition: all 0.2s;
+}
+
+.gender-toggle button.active {
+  background: var(--yellow);
+  color: #111111;
+  font-weight: 600;
+}
+
 /* Generate Section */
 .generate-section {
   max-width: 800px;
@@ -311,13 +362,13 @@ body {
 }
 
 .dropzone {
-  border: 2px dashed var(--border);
+  border: 2px dashed #dddddd;
   border-radius: 12px;
   padding: 60px 40px;
   text-align: center;
   cursor: pointer;
   transition: all 0.2s;
-  background: var(--dark);
+  background: #ffffff;
 }
 
 .dropzone:hover {
@@ -335,12 +386,12 @@ body {
 .dropzone p {
   font-size: 1rem;
   margin-bottom: 8px;
-  color: var(--white);
+  color: #111111;
 }
 
 .dropzone span {
   font-size: 0.85rem;
-  color: var(--light-gray);
+  color: #777777;
 }
 
 .image-grid {
@@ -356,7 +407,7 @@ body {
   height: 100px;
   border-radius: 8px;
   overflow: hidden;
-  border: 1px solid var(--border);
+  border: 1px solid #dddddd;
 }
 
 .image-item img {
@@ -396,16 +447,16 @@ body {
   display: block;
   margin-bottom: 8px;
   font-size: 0.85rem;
-  color: var(--light-gray);
+  color: #555555;
 }
 
 .option-field input {
   width: 100%;
   padding: 12px 14px;
-  border: 1px solid var(--border);
+  border: 1px solid #dddddd;
   border-radius: 8px;
-  background: var(--dark);
-  color: var(--white);
+  background: #ffffff;
+  color: #111111;
   font-size: 0.9rem;
 }
 
@@ -419,7 +470,7 @@ body {
   background: rgba(220, 53, 69, 0.1);
   border: 1px solid rgba(220, 53, 69, 0.3);
   border-radius: 8px;
-  color: #ff6b6b;
+  color: #cc0000;
   margin-bottom: 16px;
 }
 
@@ -468,8 +519,8 @@ body {
 }
 
 .listing-card {
-  background: var(--dark);
-  border: 1px solid var(--border);
+  background: #ffffff;
+  border: 1px solid #e0e0e0;
   border-radius: 10px;
   overflow: hidden;
 }
@@ -479,29 +530,30 @@ body {
   justify-content: space-between;
   align-items: center;
   padding: 14px 18px;
-  background: var(--dark-gray);
-  border-bottom: 1px solid var(--border);
+  background: #f5f5f5;
+  border-bottom: 1px solid #e0e0e0;
 }
 
 .card-header h3 {
   font-size: 0.9rem;
   font-weight: 600;
+  color: #111111;
 }
 
 .copy-btn {
   padding: 6px 14px;
-  border: 1px solid var(--border);
+  border: 1px solid #cccccc;
   border-radius: 4px;
   background: transparent;
-  color: var(--light-gray);
+  color: #555555;
   font-size: 0.8rem;
   cursor: pointer;
   transition: all 0.2s;
 }
 
 .copy-btn:hover {
-  background: var(--medium-gray);
-  color: var(--white);
+  background: #f0f0f0;
+  color: #111111;
 }
 
 .copy-btn.copied {
@@ -522,19 +574,19 @@ body {
   font-family: 'SF Mono', Monaco, monospace;
   font-size: 0.85rem;
   line-height: 1.6;
-  color: #ccc;
+  color: #333333;
 }
 
 /* Listings Section */
 .listing-count {
-  color: var(--light-gray);
+  color: #777777;
   font-size: 0.9rem;
 }
 
 .loading-state, .empty-state {
   text-align: center;
   padding: 60px 20px;
-  color: var(--light-gray);
+  color: #777777;
 }
 
 .empty-state button {
@@ -556,7 +608,7 @@ body {
 .data-table table {
   width: 100%;
   border-collapse: collapse;
-  background: var(--dark);
+  background: #ffffff;
   border-radius: 10px;
   overflow: hidden;
 }
@@ -564,20 +616,21 @@ body {
 .data-table th {
   text-align: left;
   padding: 14px 16px;
-  background: var(--dark-gray);
-  color: var(--light-gray);
+  background: #f5f5f5;
+  color: #555555;
   font-size: 0.8rem;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.5px;
-  border-bottom: 1px solid var(--border);
+  border-bottom: 1px solid #e0e0e0;
 }
 
 .data-table td {
   padding: 14px 16px;
-  border-bottom: 1px solid var(--border);
+  border-bottom: 1px solid #eeeeee;
   font-size: 0.9rem;
   vertical-align: middle;
+  color: #111111;
 }
 
 .data-table tr {
@@ -586,7 +639,7 @@ body {
 }
 
 .data-table tbody tr:hover {
-  background: var(--medium-gray);
+  background: #f9f9f9;
 }
 
 /* Thumbnail in table */
@@ -600,7 +653,7 @@ body {
   height: 60px;
   object-fit: cover;
   border-radius: 6px;
-  border: 1px solid var(--border);
+  border: 1px solid #e0e0e0;
 }
 
 .no-thumbnail {
@@ -609,10 +662,19 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: var(--dark-gray);
+  background: #f0f0f0;
   border-radius: 6px;
   font-size: 0.7rem;
-  color: var(--light-gray);
+  color: #888888;
+}
+
+/* Serial number column */
+.serial-cell {
+  width: 40px;
+  color: #999999;
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-align: center;
 }
 
 .title-cell {
@@ -624,7 +686,8 @@ body {
 
 .sku-cell {
   font-family: monospace;
-  color: var(--yellow);
+  color: var(--yellow-hover);
+  font-weight: 600;
 }
 
 .actions-cell {
@@ -634,7 +697,7 @@ body {
 
 .view-btn, .delete-btn {
   padding: 6px 12px;
-  border: 1px solid var(--border);
+  border: 1px solid #cccccc;
   border-radius: 4px;
   background: transparent;
   font-size: 0.8rem;
@@ -643,7 +706,7 @@ body {
 }
 
 .view-btn {
-  color: var(--white);
+  color: #111111;
 }
 
 .view-btn:hover {
@@ -665,9 +728,10 @@ body {
 .footer {
   padding: 20px 32px;
   text-align: center;
-  color: #444;
+  color: #aaaaaa;
   font-size: 0.8rem;
-  border-top: 1px solid var(--border);
+  border-top: 1px solid #eeeeee;
+  background: #ffffff;
 }
 
 /* Scrollbar */
@@ -677,11 +741,11 @@ body {
 }
 
 ::-webkit-scrollbar-track {
-  background: var(--dark);
+  background: #f5f5f5;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: var(--medium-gray);
+  background: #dddddd;
   border-radius: 3px;
 }
 
@@ -715,198 +779,4 @@ body {
     gap: 12px;
     align-items: flex-start;
   }
-}/* Remember Me */
-.remember-me {
-  margin-bottom: 16px;
-}
-
-.remember-me label {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 0.85rem;
-  color: var(--light-gray);
-  cursor: pointer;
-  user-select: none;
-}
-
-.remember-me input[type="checkbox"] {
-  width: 16px;
-  height: 16px;
-  accent-color: var(--yellow);
-  cursor: pointer;
-}
-
-/* Serial number column */
-.serial-cell {
-  width: 40px;
-  color: var(--light-gray);
-  font-size: 0.8rem;
-  font-weight: 600;
-  text-align: center;
-}
-/* ── LIGHT THEME (post-login) ── */
-body {
-  background: #ffffff;
-  color: #111111;
-}
-
-.app {
-  background: #ffffff;
-}
-
-.header {
-  background: #ffffff;
-  border-bottom: 1px solid #e0e0e0;
-}
-
-.header-left h1 {
-  color: #111111;
-}
-
-.user-email {
-  color: #555555;
-}
-
-.sign-out-btn {
-  color: #111111;
-  border-color: #cccccc;
-}
-
-.sign-out-btn:hover {
-  background: #f0f0f0;
-}
-
-.nav {
-  background: #ffffff;
-  border-bottom: 1px solid #e0e0e0;
-}
-
-.nav button {
-  color: #777777;
-}
-
-.nav button:hover:not(:disabled) {
-  color: #111111;
-}
-
-.main {
-  background: #f7f7f7;
-}
-
-.section-header h2 {
-  color: #111111;
-}
-
-.dropzone {
-  background: #ffffff;
-  border-color: #dddddd;
-}
-
-.dropzone p {
-  color: #111111;
-}
-
-.option-field input {
-  background: #ffffff;
-  color: #111111;
-  border-color: #dddddd;
-}
-
-.option-field label {
-  color: #555555;
-}
-
-.listing-card {
-  background: #ffffff;
-  border-color: #e0e0e0;
-}
-
-.card-header {
-  background: #f5f5f5;
-  border-bottom: 1px solid #e0e0e0;
-}
-
-.card-header h3 {
-  color: #111111;
-}
-
-.card-content pre {
-  color: #333333;
-}
-
-.copy-btn {
-  color: #555555;
-  border-color: #cccccc;
-}
-
-.copy-btn:hover {
-  background: #f0f0f0;
-  color: #111111;
-}
-
-.data-table table {
-  background: #ffffff;
-}
-
-.data-table th {
-  background: #f5f5f5;
-  color: #555555;
-  border-bottom: 1px solid #e0e0e0;
-}
-
-.data-table td {
-  border-bottom: 1px solid #eeeeee;
-  color: #111111;
-}
-
-.data-table tbody tr:hover {
-  background: #f9f9f9;
-}
-
-.no-thumbnail {
-  background: #f0f0f0;
-  color: #888888;
-}
-
-.action-btn {
-  color: #111111;
-  border-color: #cccccc;
-}
-
-.action-btn:hover {
-  background: #f0f0f0;
-}
-
-.view-btn {
-  color: #111111;
-}
-
-.sign-out-btn {
-  color: #111111;
-}
-
-.footer {
-  color: #aaaaaa;
-  border-top: 1px solid #eeeeee;
-}
-
-.loading-state, .empty-state {
-  color: #777777;
-}
-
-.listing-count {
-  color: #777777;
-}
-
-.serial-cell {
-  color: #999999;
-}
-
-::-webkit-scrollbar-track {
-  background: #f5f5f5;
-}
-
-::-webkit-scrollbar-thumb {
-  background: #dddddd;
 }
