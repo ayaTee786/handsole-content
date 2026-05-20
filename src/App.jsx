@@ -6,7 +6,7 @@ function App() {
   // Auth state
   const [session, setSession] = useState(null);
   const [authLoading, setAuthLoading] = useState(true);
-  const [authMode, setAuthMode] = useState('signin'); // signin or signup
+  const [authMode, setAuthMode] = useState('signin');
   const [authEmail, setAuthEmail] = useState('');
   const [authPassword, setAuthPassword] = useState('');
   const [authError, setAuthError] = useState(null);
@@ -163,12 +163,12 @@ function App() {
       const data = await response.json();
       setListing(data);
 
-      // Save to Supabase
+      // Save to Supabase with full thumbnail
       const { error: insertError } = await supabase
         .from('listings')
         .insert({
           user_id: session.user.id,
-          thumbnail: imageBase64s[0].substring(0, 50000), // Limit size
+          thumbnail: imageBase64s[0],
           title: data.title || 'Untitled',
           focus_keyword: data.focusKeyword || '',
           sku: data.sku || '',
@@ -187,7 +187,7 @@ function App() {
       if (insertError) {
         console.error('Error saving listing:', insertError);
       } else {
-        fetchListings(); // Refresh the list
+        fetchListings();
       }
 
       setActiveTab('result');
@@ -558,6 +558,7 @@ ${listing.keywordsUsed || 'N/A'}
                 <table>
                   <thead>
                     <tr>
+                      <th>Image</th>
                       <th>Date</th>
                       <th>Title</th>
                       <th>Focus Keyword</th>
@@ -568,10 +569,21 @@ ${listing.keywordsUsed || 'N/A'}
                   <tbody>
                     {listings.map((item) => (
                       <tr key={item.id} onClick={() => viewListing(item)}>
+                        <td className="thumbnail-cell">
+                          {item.thumbnail ? (
+                            <img 
+                              src={`data:image/jpeg;base64,${item.thumbnail}`} 
+                              alt={item.title}
+                              className="table-thumbnail"
+                            />
+                          ) : (
+                            <div className="no-thumbnail">No img</div>
+                          )}
+                        </td>
                         <td>{new Date(item.created_at).toLocaleDateString()}</td>
-                        <td className="title-cell">{item.title?.substring(0, 60)}...</td>
-                        <td>{item.focus_keyword}</td>
-                        <td className="sku-cell">{item.sku}</td>
+                        <td className="title-cell">{item.title?.replace(/\*\*/g, '').substring(0, 50)}...</td>
+                        <td>{item.focus_keyword?.replace(/\*\*/g, '')}</td>
+                        <td className="sku-cell">{item.sku?.replace(/\*\*/g, '')}</td>
                         <td className="actions-cell">
                           <button className="view-btn" onClick={(e) => { e.stopPropagation(); viewListing(item); }}>View</button>
                           <button className="delete-btn" onClick={(e) => deleteListing(item.id, e)}>Delete</button>
