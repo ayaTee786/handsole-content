@@ -27,9 +27,10 @@ function App() {
   const [session, setSession] = useState(null);
   const [authLoading, setAuthLoading] = useState(true);
   const [authMode, setAuthMode] = useState('signin');
-  const [authEmail, setAuthEmail] = useState('');
+  const [authEmail, setAuthEmail] = useState(() => localStorage.getItem('hs_saved_email') || '');
   const [authPassword, setAuthPassword] = useState('');
   const [authError, setAuthError] = useState(null);
+  const [rememberMe, setRememberMe] = useState(() => !!localStorage.getItem('hs_saved_email'));
 
   const [images, setImages] = useState([]);
   const [imageBase64s, setImageBase64s] = useState([]);
@@ -82,6 +83,11 @@ function App() {
     try {
       const { error } = await supabase.auth.signInWithPassword({ email: authEmail, password: authPassword });
       if (error) throw error;
+      if (rememberMe) {
+        localStorage.setItem('hs_saved_email', authEmail);
+      } else {
+        localStorage.removeItem('hs_saved_email');
+      }
     } catch (err) {
       setAuthError(err.message);
     }
@@ -299,6 +305,18 @@ function App() {
               <input type="password" value={authPassword} onChange={(e) => setAuthPassword(e.target.value)} placeholder="••••••••" required minLength={6} />
             </div>
             {authError && <div className="auth-error">{authError}</div>}
+            {authMode === 'signin' && (
+              <div className="remember-me">
+                <label>
+                  <input
+                    type="checkbox"
+                    checked={rememberMe}
+                    onChange={(e) => setRememberMe(e.target.checked)}
+                  />
+                  Remember me
+                </label>
+              </div>
+            )}
             <button type="submit" className="auth-submit">{authMode === 'signin' ? 'Sign In' : 'Create Account'}</button>
           </form>
         </div>
@@ -409,6 +427,7 @@ function App() {
                 <table>
                   <thead>
                     <tr>
+                      <th>#</th>
                       <th>Image</th>
                       <th>Date</th>
                       <th>Title</th>
@@ -418,8 +437,9 @@ function App() {
                     </tr>
                   </thead>
                   <tbody>
-                    {listings.map((item) => (
+                    {listings.map((item, index) => (
                       <tr key={item.id} onClick={() => viewListing(item)}>
+                        <td className="serial-cell">{index + 1}</td>
                         <td className="thumbnail-cell">
                           {item.thumbnail ? (
                             <img
