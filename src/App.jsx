@@ -2,8 +2,28 @@ import { useState, useCallback, useEffect } from 'react';
 import { supabase } from './supabaseClient';
 import './App.css';
 
+// Resize image to small thumbnail before saving to Supabase
+const generateThumbnail = (file, maxSize = 80) => {
+  return new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        const scale = Math.min(maxSize / img.width, maxSize / img.height);
+        canvas.width = img.width * scale;
+        canvas.height = img.height * scale;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        resolve(canvas.toDataURL('image/jpeg', 0.7).split(',')[1]);
+      };
+      img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+  });
+};
+
 function App() {
-  // Auth state
   const [session, setSession] = useState(null);
   const [authLoading, setAuthLoading] = useState(true);
   const [authMode, setAuthMode] = useState('signin');
@@ -11,13 +31,10 @@ function App() {
   const [authPassword, setAuthPassword] = useState('');
   const [authError, setAuthError] = useState(null);
 
-  // App state
   const [images, setImages] = useState([]);
   const [imageBase64s, setImageBase64s] = useState([]);
-  const [productDetails, setProductDetails] = useState({
-    additionalColors: '',
-    customNotes: ''
-  });
+  const [imageFiles, setImageFiles] = useState([]);
+  const [productDetails, setProductDetails] = useState({ additionalColors: '', customNotes: '' });
   const [listing, setListing] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -27,25 +44,19 @@ function App() {
   const [listingsLoading, setListingsLoading] = useState(false);
   const [selectedListing, setSelectedListing] = useState(null);
 
-  // Check auth session on mount
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
       setAuthLoading(false);
     });
-
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session);
     });
-
     return () => subscription.unsubscribe();
   }, []);
 
-  // Fetch listings when authenticated
   useEffect(() => {
-    if (session) {
-      fetchListings();
-    }
+    if (session) fetchListings();
   }, [session]);
 
   const fetchListings = async () => {
@@ -56,7 +67,6 @@ function App() {
         .select('*')
         .eq('user_id', session.user.id)
         .order('created_at', { ascending: false });
-
       if (error) throw error;
       setListings(data || []);
     } catch (err) {
@@ -70,10 +80,7 @@ function App() {
     e.preventDefault();
     setAuthError(null);
     try {
-      const { error } = await supabase.auth.signInWithPassword({
-        email: authEmail,
-        password: authPassword,
-      });
+      const { error } = await supabase.auth.signInWithPassword({ email: authEmail, password: authPassword });
       if (error) throw error;
     } catch (err) {
       setAuthError(err.message);
@@ -84,10 +91,7 @@ function App() {
     e.preventDefault();
     setAuthError(null);
     try {
-      const { error } = await supabase.auth.signUp({
-        email: authEmail,
-        password: authPassword,
-      });
+      const { error } = await supabase.auth.signUp({ email: authEmail, password: authPassword });
       if (error) throw error;
       setAuthError('Check your email for confirmation link!');
     } catch (err) {
@@ -106,17 +110,19 @@ function App() {
     const files = Array.from(e.target.files || e.dataTransfer?.files || []);
     const newImages = [];
     const newBase64s = [];
+    const newFiles = [];
 
     files.forEach((file) => {
       if (file.type.startsWith('image/')) {
+        newFiles.push(file);
         const reader = new FileReader();
         reader.onload = (event) => {
           newImages.push(URL.createObjectURL(file));
           newBase64s.push(event.target.result.split(',')[1]);
-
           if (newImages.length === files.length) {
             setImages(prev => [...prev, ...newImages]);
             setImageBase64s(prev => [...prev, ...newBase64s]);
+            setImageFiles(prev => [...prev, ...newFiles]);
           }
         };
         reader.readAsDataURL(file);
@@ -127,6 +133,7 @@ function App() {
   const removeImage = (index) => {
     setImages(prev => prev.filter((_, i) => i !== index));
     setImageBase64s(prev => prev.filter((_, i) => i !== index));
+    setImageFiles(prev => prev.filter((_, i) => i !== index));
   };
 
   const generateListing = async () => {
@@ -134,10 +141,8 @@ function App() {
       setError('Please upload at least one product image');
       return;
     }
-
     setLoading(true);
     setError(null);
-
     try {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 120000);
@@ -152,7 +157,6 @@ function App() {
         }),
         signal: controller.signal
       });
-
       clearTimeout(timeoutId);
 
       if (!response.ok) {
@@ -163,33 +167,32 @@ function App() {
       const data = await response.json();
       setListing(data);
 
-      // Save to Supabase with full thumbnail
-      const { error: insertError } = await supabase
-        .from('listings')
-        .insert({
-          user_id: session.user.id,
-          thumbnail: imageBase64s[0],
-          title: data.title || 'Untitled',
-          focus_keyword: data.focusKeyword || '',
-          sku: data.sku || '',
-          product_analysis: data.productAnalysis || '',
-          supporting_keywords: data.supportingKeywords || '',
-          tags: data.tags || '',
-          description: data.description || '',
-          attributes: data.attributes || '',
-          alt_texts: data.altTexts || '',
-          file_names: data.fileNames || '',
-          shop_category: data.shopCategory || '',
-          occasions: data.occasions || '',
-          keywords_used: data.keywordsUsed || ''
-        });
+      // Generate tiny 80px thumbnail from raw File — much smaller than full base64
+      const thumbnail = imageFiles[0] ? await generateThumbnail(imageFiles[0]) : null;
+
+      const { error: insertError } = await supabase.from('listings').insert({
+        user_id: session.user.id,
+        thumbnail: thumbnail,
+        title: data.title || 'Untitled',
+        focus_keyword: data.focusKeyword || '',
+        sku: data.sku || '',
+        product_analysis: data.productAnalysis || '',
+        supporting_keywords: data.supportingKeywords || '',
+        tags: data.tags || '',
+        description: data.description || '',
+        attributes: data.attributes || '',
+        alt_texts: data.altTexts || '',
+        file_names: data.fileNames || '',
+        shop_category: data.shopCategory || '',
+        occasions: data.occasions || '',
+        keywords_used: data.keywordsUsed || ''
+      });
 
       if (insertError) {
         console.error('Error saving listing:', insertError);
       } else {
         fetchListings();
       }
-
       setActiveTab('result');
     } catch (err) {
       if (err.name === 'AbortError') {
@@ -225,13 +228,8 @@ function App() {
   const deleteListing = async (id, e) => {
     e.stopPropagation();
     if (!confirm('Delete this listing?')) return;
-
     try {
-      const { error } = await supabase
-        .from('listings')
-        .delete()
-        .eq('id', id);
-
+      const { error } = await supabase.from('listings').delete().eq('id', id);
       if (error) throw error;
       setListings(prev => prev.filter(item => item.id !== id));
       if (selectedListing?.id === id) {
@@ -255,49 +253,7 @@ function App() {
 
   const downloadListing = () => {
     if (!listing) return;
-    const content = `HANDSOLE ETSY LISTING
-Generated: ${new Date().toLocaleString()}
-================================
-
-1. PRODUCT ANALYSIS
-${listing.productAnalysis || 'N/A'}
-
-2. FOCUS KEYWORD
-${listing.focusKeyword || 'N/A'}
-
-3. SUPPORTING KEYWORDS
-${listing.supportingKeywords || 'N/A'}
-
-4. ETSY TITLE
-${listing.title || 'N/A'}
-
-5. ETSY 13 TAGS
-${listing.tags || 'N/A'}
-
-6. DESCRIPTION
-${listing.description || 'N/A'}
-
-7. ETSY ATTRIBUTES
-${listing.attributes || 'N/A'}
-
-8. IMAGE ALT TEXTS
-${listing.altTexts || 'N/A'}
-
-9. IMAGE FILE NAMES
-${listing.fileNames || 'N/A'}
-
-10. SKU
-${listing.sku || 'N/A'}
-
-11. SHOP CATEGORY
-${listing.shopCategory || 'N/A'}
-
-12. BEST OCCASIONS
-${listing.occasions || 'N/A'}
-
-13. KEYWORDS USED
-${listing.keywordsUsed || 'N/A'}
-`;
+    const content = `HANDSOLE ETSY LISTING\nGenerated: ${new Date().toLocaleString()}\n================================\n\n1. PRODUCT ANALYSIS\n${listing.productAnalysis || 'N/A'}\n\n2. FOCUS KEYWORD\n${listing.focusKeyword || 'N/A'}\n\n3. SUPPORTING KEYWORDS\n${listing.supportingKeywords || 'N/A'}\n\n4. ETSY TITLE\n${listing.title || 'N/A'}\n\n5. ETSY 13 TAGS\n${listing.tags || 'N/A'}\n\n6. DESCRIPTION\n${listing.description || 'N/A'}\n\n7. ETSY ATTRIBUTES\n${listing.attributes || 'N/A'}\n\n8. IMAGE ALT TEXTS\n${listing.altTexts || 'N/A'}\n\n9. IMAGE FILE NAMES\n${listing.fileNames || 'N/A'}\n\n10. SKU\n${listing.sku || 'N/A'}\n\n11. SHOP CATEGORY\n${listing.shopCategory || 'N/A'}\n\n12. BEST OCCASIONS\n${listing.occasions || 'N/A'}\n\n13. KEYWORDS USED\n${listing.keywordsUsed || 'N/A'}\n`;
     const blob = new Blob([content], { type: 'text/plain' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -311,29 +267,16 @@ ${listing.keywordsUsed || 'N/A'}
     <div className="listing-card">
       <div className="card-header">
         <h3>{title}</h3>
-        <button
-          className={`copy-btn ${copiedSection === section ? 'copied' : ''}`}
-          onClick={() => copyToClipboard(content, section)}
-        >
+        <button className={`copy-btn ${copiedSection === section ? 'copied' : ''}`} onClick={() => copyToClipboard(content, section)}>
           {copiedSection === section ? 'Copied' : 'Copy'}
         </button>
       </div>
-      <div className="card-content">
-        <pre>{content}</pre>
-      </div>
+      <div className="card-content"><pre>{content}</pre></div>
     </div>
   );
 
-  // Auth loading
-  if (authLoading) {
-    return (
-      <div className="auth-loading">
-        <div className="spinner-large"></div>
-      </div>
-    );
-  }
+  if (authLoading) return <div className="auth-loading"><div className="spinner-large"></div></div>;
 
-  // Auth screen
   if (!session) {
     return (
       <div className="auth-container">
@@ -342,61 +285,31 @@ ${listing.keywordsUsed || 'N/A'}
             <h1>HAND<span>SOLE</span></h1>
             <p>Etsy Listing Generator</p>
           </div>
-
           <div className="auth-tabs">
-            <button
-              className={authMode === 'signin' ? 'active' : ''}
-              onClick={() => setAuthMode('signin')}
-            >
-              Sign In
-            </button>
-            <button
-              className={authMode === 'signup' ? 'active' : ''}
-              onClick={() => setAuthMode('signup')}
-            >
-              Sign Up
-            </button>
+            <button className={authMode === 'signin' ? 'active' : ''} onClick={() => setAuthMode('signin')}>Sign In</button>
+            <button className={authMode === 'signup' ? 'active' : ''} onClick={() => setAuthMode('signup')}>Sign Up</button>
           </div>
-
           <form onSubmit={authMode === 'signin' ? handleSignIn : handleSignUp}>
             <div className="auth-field">
               <label>Email</label>
-              <input
-                type="email"
-                value={authEmail}
-                onChange={(e) => setAuthEmail(e.target.value)}
-                placeholder="you@example.com"
-                required
-              />
+              <input type="email" value={authEmail} onChange={(e) => setAuthEmail(e.target.value)} placeholder="you@example.com" required />
             </div>
             <div className="auth-field">
               <label>Password</label>
-              <input
-                type="password"
-                value={authPassword}
-                onChange={(e) => setAuthPassword(e.target.value)}
-                placeholder="••••••••"
-                required
-                minLength={6}
-              />
+              <input type="password" value={authPassword} onChange={(e) => setAuthPassword(e.target.value)} placeholder="••••••••" required minLength={6} />
             </div>
             {authError && <div className="auth-error">{authError}</div>}
-            <button type="submit" className="auth-submit">
-              {authMode === 'signin' ? 'Sign In' : 'Create Account'}
-            </button>
+            <button type="submit" className="auth-submit">{authMode === 'signin' ? 'Sign In' : 'Create Account'}</button>
           </form>
         </div>
       </div>
     );
   }
 
-  // Main app
   return (
     <div className="app">
       <header className="header">
-        <div className="header-left">
-          <h1>HAND<span>SOLE</span></h1>
-        </div>
+        <div className="header-left"><h1>HAND<span>SOLE</span></h1></div>
         <div className="header-right">
           <span className="user-email">{session.user.email}</span>
           <button className="sign-out-btn" onClick={handleSignOut}>Sign Out</button>
@@ -404,54 +317,25 @@ ${listing.keywordsUsed || 'N/A'}
       </header>
 
       <nav className="nav">
-        <button
-          className={activeTab === 'generate' ? 'active' : ''}
-          onClick={() => { setActiveTab('generate'); setSelectedListing(null); }}
-        >
-          Generate
-        </button>
-        <button
-          className={activeTab === 'result' ? 'active' : ''}
-          onClick={() => setActiveTab('result')}
-          disabled={!listing}
-        >
-          Result
-        </button>
-        <button
-          className={activeTab === 'listings' ? 'active' : ''}
-          onClick={() => setActiveTab('listings')}
-        >
-          All Listings ({listings.length})
-        </button>
+        <button className={activeTab === 'generate' ? 'active' : ''} onClick={() => { setActiveTab('generate'); setSelectedListing(null); }}>Generate</button>
+        <button className={activeTab === 'result' ? 'active' : ''} onClick={() => setActiveTab('result')} disabled={!listing}>Result</button>
+        <button className={activeTab === 'listings' ? 'active' : ''} onClick={() => setActiveTab('listings')}>All Listings ({listings.length})</button>
       </nav>
 
       <main className="main">
         {activeTab === 'generate' && (
           <div className="generate-section">
-            <div className="section-header">
-              <h2>Generate New Listing</h2>
-            </div>
-
+            <div className="section-header"><h2>Generate New Listing</h2></div>
             <div className="upload-area">
-              <div
-                className="dropzone"
+              <div className="dropzone"
                 onDrop={(e) => { e.preventDefault(); handleImageUpload(e); }}
                 onDragOver={(e) => e.preventDefault()}
-                onClick={() => document.getElementById('file-input').click()}
-              >
-                <input
-                  id="file-input"
-                  type="file"
-                  accept="image/*"
-                  multiple
-                  onChange={handleImageUpload}
-                  style={{ display: 'none' }}
-                />
+                onClick={() => document.getElementById('file-input').click()}>
+                <input id="file-input" type="file" accept="image/*" multiple onChange={handleImageUpload} style={{ display: 'none' }} />
                 <div className="dropzone-icon">+</div>
                 <p>Drop product images here or click to upload</p>
                 <span>Use clear, well-lit photos</span>
               </div>
-
               {images.length > 0 && (
                 <div className="image-grid">
                   {images.map((img, index) => (
@@ -463,43 +347,19 @@ ${listing.keywordsUsed || 'N/A'}
                 </div>
               )}
             </div>
-
             <div className="options-grid">
               <div className="option-field">
                 <label>Additional Colors</label>
-                <input
-                  type="text"
-                  placeholder="Navy Blue, Burgundy, Tan..."
-                  value={productDetails.additionalColors}
-                  onChange={(e) => setProductDetails(prev => ({ ...prev, additionalColors: e.target.value }))}
-                />
+                <input type="text" placeholder="Navy Blue, Burgundy, Tan..." value={productDetails.additionalColors} onChange={(e) => setProductDetails(prev => ({ ...prev, additionalColors: e.target.value }))} />
               </div>
               <div className="option-field">
                 <label>Custom Notes</label>
-                <input
-                  type="text"
-                  placeholder="Any specific details..."
-                  value={productDetails.customNotes}
-                  onChange={(e) => setProductDetails(prev => ({ ...prev, customNotes: e.target.value }))}
-                />
+                <input type="text" placeholder="Any specific details..." value={productDetails.customNotes} onChange={(e) => setProductDetails(prev => ({ ...prev, customNotes: e.target.value }))} />
               </div>
             </div>
-
             {error && <div className="error-msg">{error}</div>}
-
-            <button
-              className="generate-btn"
-              onClick={generateListing}
-              disabled={loading || images.length === 0}
-            >
-              {loading ? (
-                <>
-                  <span className="spinner"></span>
-                  Generating...
-                </>
-              ) : (
-                'Generate Listing'
-              )}
+            <button className="generate-btn" onClick={generateListing} disabled={loading || images.length === 0}>
+              {loading ? <><span className="spinner"></span>Generating...</> : 'Generate Listing'}
             </button>
           </div>
         )}
@@ -507,17 +367,12 @@ ${listing.keywordsUsed || 'N/A'}
         {activeTab === 'result' && listing && (
           <div className="result-section">
             <div className="section-header">
-              <h2>
-                {selectedListing ? 'Viewing Saved Listing' : 'Generated Listing'}
-              </h2>
+              <h2>{selectedListing ? 'Viewing Saved Listing' : 'Generated Listing'}</h2>
               <div className="section-actions">
                 <button className="action-btn" onClick={downloadListing}>Download</button>
-                <button className="action-btn primary" onClick={() => { setActiveTab('generate'); setListing(null); setSelectedListing(null); setImages([]); setImageBase64s([]); }}>
-                  New Listing
-                </button>
+                <button className="action-btn primary" onClick={() => { setActiveTab('generate'); setListing(null); setSelectedListing(null); setImages([]); setImageBase64s([]); setImageFiles([]); }}>New Listing</button>
               </div>
             </div>
-
             <div className="cards-grid">
               <ListingCard title="1. Product Analysis" content={listing.productAnalysis} section="analysis" />
               <ListingCard title="2. Focus Keyword" content={listing.focusKeyword} section="focus" />
@@ -542,12 +397,8 @@ ${listing.keywordsUsed || 'N/A'}
               <h2>All Listings</h2>
               <span className="listing-count">{listings.length} listings</span>
             </div>
-
             {listingsLoading ? (
-              <div className="loading-state">
-                <div className="spinner"></div>
-                <p>Loading listings...</p>
-              </div>
+              <div className="loading-state"><div className="spinner"></div><p>Loading listings...</p></div>
             ) : listings.length === 0 ? (
               <div className="empty-state">
                 <p>No listings yet</p>
@@ -571,10 +422,11 @@ ${listing.keywordsUsed || 'N/A'}
                       <tr key={item.id} onClick={() => viewListing(item)}>
                         <td className="thumbnail-cell">
                           {item.thumbnail ? (
-                            <img 
-                              src={`data:image/jpeg;base64,${item.thumbnail}`} 
+                            <img
+                              src={`data:image/jpeg;base64,${item.thumbnail}`}
                               alt={item.title}
                               className="table-thumbnail"
+                              style={{ width: '60px', height: '60px', objectFit: 'cover', borderRadius: '4px', display: 'block' }}
                             />
                           ) : (
                             <div className="no-thumbnail">No img</div>
