@@ -1,4 +1,4 @@
-* {
+ * {
   margin: 0;
   padding: 0;
   box-sizing: border-box;
@@ -577,6 +577,7 @@ body {
   padding: 14px 16px;
   border-bottom: 1px solid var(--border);
   font-size: 0.9rem;
+  vertical-align: middle;
 }
 
 .data-table tr {
@@ -588,8 +589,34 @@ body {
   background: var(--medium-gray);
 }
 
+/* Thumbnail in table */
+.thumbnail-cell {
+  width: 70px;
+  padding: 8px 16px !important;
+}
+
+.table-thumbnail {
+  width: 60px;
+  height: 60px;
+  object-fit: cover;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+}
+
+.no-thumbnail {
+  width: 60px;
+  height: 60px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--dark-gray);
+  border-radius: 6px;
+  font-size: 0.7rem;
+  color: var(--light-gray);
+}
+
 .title-cell {
-  max-width: 300px;
+  max-width: 250px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
