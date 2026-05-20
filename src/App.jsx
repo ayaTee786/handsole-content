@@ -68,6 +68,8 @@ function App() {
   const [listingsLoading, setListingsLoading] = useState(false);
   const [listingsFilter, setListingsFilter] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [perPage, setPerPage] = useState(50);
 
   // Duplicate detection
   const [duplicateWarning, setDuplicateWarning] = useState(null);
@@ -111,6 +113,12 @@ function App() {
       return matchesGender && matchesSearch;
     });
   }, [listings, listingsFilter, searchQuery]);
+
+  // Reset to page 1 when filter or search changes
+  useEffect(() => { setCurrentPage(1); }, [listingsFilter, searchQuery]);
+
+  const totalPages = Math.ceil(filteredListings.length / perPage);
+  const paginatedListings = filteredListings.slice((currentPage - 1) * perPage, currentPage * perPage);
 
   // Compute SHA-256 fingerprint of image before API call
   const computeImageHash = async (base64String) => {
@@ -610,7 +618,7 @@ function App() {
                     </tr>
                   </thead>
                   <tbody>
-                    {filteredListings.map((item, index) => (
+                    {paginatedListings.map((item, index) => (
                       <tr key={item.id} onClick={() => viewListing(item)}>
                         <td className="col-num">{index + 1}</td>
                         <td className="col-img">
@@ -638,6 +646,36 @@ function App() {
                   </tbody>
                 </table>
               </div>
+
+              {/* Pagination bar */}
+              {filteredListings.length > 0 && (
+                <div className="pagination-bar">
+                  <span className="pagination-info">
+                    Showing {((currentPage - 1) * perPage) + 1}–{Math.min(currentPage * perPage, filteredListings.length)} of {filteredListings.length}
+                  </span>
+                  <div className="pagination-controls">
+                    <button className="page-btn" onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1}>‹ Prev</button>
+                    {Array.from({ length: totalPages }, (_, i) => i + 1)
+                      .filter(p => p === 1 || p === totalPages || Math.abs(p - currentPage) <= 1)
+                      .reduce((acc, p, i, arr) => { if (i > 0 && p - arr[i-1] > 1) acc.push('...'); acc.push(p); return acc; }, [])
+                      .map((p, i) => p === '...'
+                        ? <span key={`d${i}`} className="page-dots">…</span>
+                        : <button key={p} className={`page-btn${p === currentPage ? ' active' : ''}`} onClick={() => setCurrentPage(p)}>{p}</button>
+                      )
+                    }
+                    <button className="page-btn" onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages}>Next ›</button>
+                  </div>
+                  <div className="pagination-perpage">
+                    <label>Per page:</label>
+                    <select value={perPage} onChange={(e) => { setPerPage(Number(e.target.value)); setCurrentPage(1); }}>
+                      <option value={25}>25</option>
+                      <option value={50}>50</option>
+                      <option value={75}>75</option>
+                      <option value={100}>100</option>
+                    </select>
+                  </div>
+                </div>
+              )}
             )}
           </div>
         )}
