@@ -1,50 +1,45 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useMemo } from 'react';
 import { supabase } from './supabaseClient';
 import './App.css';
 
-// Compress image before sending to API (keeps under Vercel 4.5MB limit)
-const compressForAPI = (file, maxSize = 1024) => {
-  return new Promise((resolve) => {
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      const img = new Image();
-      img.onload = () => {
-        const canvas = document.createElement('canvas');
-        const scale = Math.min(maxSize / img.width, maxSize / img.height, 1);
-        canvas.width = img.width * scale;
-        canvas.height = img.height * scale;
-        const ctx = canvas.getContext('2d');
-        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-        resolve(canvas.toDataURL('image/jpeg', 0.8).split(',')[1]);
-      };
-      img.src = e.target.result;
+const compressForAPI = (file, maxSize = 1024) => new Promise((resolve) => {
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    const img = new Image();
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      const scale = Math.min(maxSize / img.width, maxSize / img.height, 1);
+      canvas.width = img.width * scale;
+      canvas.height = img.height * scale;
+      canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+      resolve(canvas.toDataURL('image/jpeg', 0.8).split(',')[1]);
     };
-    reader.readAsDataURL(file);
-  });
-};
+    img.src = e.target.result;
+  };
+  reader.readAsDataURL(file);
+});
 
-// Resize image to small thumbnail before saving to Supabase
-const generateThumbnail = (file, maxSize = 80) => {
-  return new Promise((resolve) => {
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      const img = new Image();
-      img.onload = () => {
-        const canvas = document.createElement('canvas');
-        const scale = Math.min(maxSize / img.width, maxSize / img.height);
-        canvas.width = img.width * scale;
-        canvas.height = img.height * scale;
-        const ctx = canvas.getContext('2d');
-        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-        resolve(canvas.toDataURL('image/jpeg', 0.7).split(',')[1]);
-      };
-      img.src = e.target.result;
+const generateThumbnail = (file, maxSize = 80) => new Promise((resolve) => {
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    const img = new Image();
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      const scale = Math.min(maxSize / img.width, maxSize / img.height);
+      canvas.width = img.width * scale;
+      canvas.height = img.height * scale;
+      canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+      resolve(canvas.toDataURL('image/jpeg', 0.7).split(',')[1]);
     };
-    reader.readAsDataURL(file);
-  });
-};
+    img.src = e.target.result;
+  };
+  reader.readAsDataURL(file);
+});
+
+const cleanText = (text) => text?.replace(/\*\*/g, '').replace(/-{3,}/g, '').trim() || '';
 
 function App() {
+  // Auth
   const [session, setSession] = useState(null);
   const [authLoading, setAuthLoading] = useState(true);
   const [authMode, setAuthMode] = useState('signin');
@@ -53,6 +48,7 @@ function App() {
   const [authError, setAuthError] = useState(null);
   const [rememberMe, setRememberMe] = useState(() => !!localStorage.getItem('hs_saved_email'));
 
+  // Generate
   const [images, setImages] = useState([]);
   const [imageBase64s, setImageBase64s] = useState([]);
   const [imageFiles, setImageFiles] = useState([]);
@@ -61,33 +57,37 @@ function App() {
   const [listing, setListing] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+
+  // UI
   const [activeTab, setActiveTab] = useState('generate');
   const [copiedSection, setCopiedSection] = useState(null);
+  const [selectedListing, setSelectedListing] = useState(null);
+
+  // Listings + filters
   const [listings, setListings] = useState([]);
   const [listingsLoading, setListingsLoading] = useState(false);
-  const [selectedListing, setSelectedListing] = useState(null);
+  const [listingsFilter, setListingsFilter] = useState('all');
+  const [searchQuery, setSearchQuery] = useState('');
+
+  // Duplicate detection
+  const [duplicateWarning, setDuplicateWarning] = useState(null);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
       setAuthLoading(false);
     });
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session);
-    });
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_e, s) => setSession(s));
     return () => subscription.unsubscribe();
   }, []);
 
-  useEffect(() => {
-    if (session) fetchListings();
-  }, [session]);
+  useEffect(() => { if (session) fetchListings(); }, [session]);
 
   const fetchListings = async () => {
     setListingsLoading(true);
     try {
       const { data, error } = await supabase
-        .from('listings')
-        .select('*')
+        .from('listings').select('*')
         .eq('user_id', session.user.id)
         .order('created_at', { ascending: false });
       if (error) throw error;
@@ -99,47 +99,81 @@ function App() {
     }
   };
 
+  // Filtered listings
+  const filteredListings = useMemo(() => {
+    return listings.filter(item => {
+      const matchesGender = listingsFilter === 'all' || (item.gender || 'men') === listingsFilter;
+      const q = searchQuery.toLowerCase();
+      const matchesSearch = !q ||
+        item.title?.toLowerCase().includes(q) ||
+        item.sku?.toLowerCase().includes(q) ||
+        item.focus_keyword?.toLowerCase().includes(q);
+      return matchesGender && matchesSearch;
+    });
+  }, [listings, listingsFilter, searchQuery]);
+
+  // Check for duplicate listings before saving
+  const checkForDuplicates = async (focusKeyword) => {
+    if (!focusKeyword) return [];
+    const words = focusKeyword.toLowerCase()
+      .replace(/[^a-z0-9 ]/g, '')
+      .split(' ').filter(w => w.length > 2).slice(0, 3).join(' ');
+    if (!words) return [];
+    const { data } = await supabase.from('listings').select('id, title, focus_keyword, sku, gender')
+      .eq('user_id', session.user.id).ilike('focus_keyword', `%${words}%`);
+    return data || [];
+  };
+
+  // Extracted save logic
+  const performSave = async (data, thumbnail, genderVal) => {
+    const { error: insertError } = await supabase.from('listings').insert({
+      user_id: session.user.id,
+      thumbnail,
+      gender: genderVal,
+      title: data.title || 'Untitled',
+      focus_keyword: data.focusKeyword || '',
+      sku: data.sku || '',
+      product_analysis: data.productAnalysis || '',
+      supporting_keywords: data.supportingKeywords || '',
+      tags: data.tags || '',
+      description: data.description || '',
+      attributes: data.attributes || '',
+      alt_texts: data.altTexts || '',
+      file_names: data.fileNames || '',
+      shop_category: data.shopCategory || '',
+      occasions: data.occasions || '',
+      keywords_used: data.keywordsUsed || ''
+    });
+    if (insertError) console.error('Error saving listing:', insertError);
+    else fetchListings();
+  };
+
   const handleSignIn = async (e) => {
-    e.preventDefault();
-    setAuthError(null);
+    e.preventDefault(); setAuthError(null);
     try {
       const { error } = await supabase.auth.signInWithPassword({ email: authEmail, password: authPassword });
       if (error) throw error;
-      if (rememberMe) {
-        localStorage.setItem('hs_saved_email', authEmail);
-      } else {
-        localStorage.removeItem('hs_saved_email');
-      }
-    } catch (err) {
-      setAuthError(err.message);
-    }
+      rememberMe ? localStorage.setItem('hs_saved_email', authEmail) : localStorage.removeItem('hs_saved_email');
+    } catch (err) { setAuthError(err.message); }
   };
 
   const handleSignUp = async (e) => {
-    e.preventDefault();
-    setAuthError(null);
+    e.preventDefault(); setAuthError(null);
     try {
       const { error } = await supabase.auth.signUp({ email: authEmail, password: authPassword });
       if (error) throw error;
       setAuthError('Check your email for confirmation link!');
-    } catch (err) {
-      setAuthError(err.message);
-    }
+    } catch (err) { setAuthError(err.message); }
   };
 
   const handleSignOut = async () => {
     await supabase.auth.signOut();
-    setListings([]);
-    setListing(null);
-    setSelectedListing(null);
+    setListings([]); setListing(null); setSelectedListing(null);
   };
 
   const handleImageUpload = useCallback((e) => {
     const files = Array.from(e.target.files || e.dataTransfer?.files || []);
-    const newImages = [];
-    const newBase64s = [];
-    const newFiles = [];
-
+    const newImages = [], newBase64s = [], newFiles = [];
     files.forEach((file) => {
       if (file.type.startsWith('image/')) {
         newFiles.push(file);
@@ -165,93 +199,63 @@ function App() {
   };
 
   const generateListing = async () => {
-    if (imageBase64s.length === 0) {
-      setError('Please upload at least one product image');
-      return;
-    }
-    setLoading(true);
-    setError(null);
+    if (imageBase64s.length === 0) { setError('Please upload at least one product image'); return; }
+    setLoading(true); setError(null); setDuplicateWarning(null);
     try {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 120000);
-
       const compressedImages = await Promise.all(imageFiles.map(f => compressForAPI(f)));
-
       const response = await fetch('/api/generate-listing', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          images: compressedImages,
-          additionalColors: productDetails.additionalColors,
-          customNotes: productDetails.customNotes,
-          gender: gender
-        }),
+        body: JSON.stringify({ images: compressedImages, additionalColors: productDetails.additionalColors, customNotes: productDetails.customNotes, gender }),
         signal: controller.signal
       });
       clearTimeout(timeoutId);
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to generate listing');
-      }
+      if (!response.ok) { const e = await response.json(); throw new Error(e.error || 'Failed to generate listing'); }
 
       const data = await response.json();
       setListing(data);
 
-      // Generate tiny 80px thumbnail from raw File — much smaller than full base64
       const thumbnail = imageFiles[0] ? await generateThumbnail(imageFiles[0]) : null;
 
-      const { error: insertError } = await supabase.from('listings').insert({
-        user_id: session.user.id,
-        thumbnail: thumbnail,
-        title: data.title || 'Untitled',
-        focus_keyword: data.focusKeyword || '',
-        sku: data.sku || '',
-        product_analysis: data.productAnalysis || '',
-        supporting_keywords: data.supportingKeywords || '',
-        tags: data.tags || '',
-        description: data.description || '',
-        attributes: data.attributes || '',
-        alt_texts: data.altTexts || '',
-        file_names: data.fileNames || '',
-        shop_category: data.shopCategory || '',
-        occasions: data.occasions || '',
-        keywords_used: data.keywordsUsed || ''
-      });
-
-      if (insertError) {
-        console.error('Error saving listing:', insertError);
-      } else {
-        fetchListings();
+      // Duplicate check
+      const dupes = await checkForDuplicates(data.focusKeyword);
+      if (dupes.length > 0) {
+        setDuplicateWarning({ matches: dupes, pendingListing: data, pendingThumbnail: thumbnail, pendingGender: gender });
+        setActiveTab('result');
+        return;
       }
+
+      await performSave(data, thumbnail, gender);
       setActiveTab('result');
     } catch (err) {
-      if (err.name === 'AbortError') {
-        setError('Request timed out. Please try again.');
-      } else {
-        setError(err.message || 'An error occurred');
-      }
+      setError(err.name === 'AbortError' ? 'Request timed out. Please try again.' : err.message || 'An error occurred');
     } finally {
       setLoading(false);
     }
   };
 
+  const handleSaveAnyway = async () => {
+    if (!duplicateWarning) return;
+    await performSave(duplicateWarning.pendingListing, duplicateWarning.pendingThumbnail, duplicateWarning.pendingGender);
+    setDuplicateWarning(null);
+  };
+
+  const handleDiscard = () => {
+    setDuplicateWarning(null);
+    setListing(null);
+    setActiveTab('generate');
+  };
+
   const viewListing = (item) => {
     setSelectedListing(item);
     setListing({
-      productAnalysis: item.product_analysis,
-      focusKeyword: item.focus_keyword,
-      supportingKeywords: item.supporting_keywords,
-      title: item.title,
-      tags: item.tags,
-      description: item.description,
-      attributes: item.attributes,
-      altTexts: item.alt_texts,
-      fileNames: item.file_names,
-      sku: item.sku,
-      shopCategory: item.shop_category,
-      occasions: item.occasions,
-      keywordsUsed: item.keywords_used
+      productAnalysis: item.product_analysis, focusKeyword: item.focus_keyword,
+      supportingKeywords: item.supporting_keywords, title: item.title, tags: item.tags,
+      description: item.description, attributes: item.attributes, altTexts: item.alt_texts,
+      fileNames: item.file_names, sku: item.sku, shopCategory: item.shop_category,
+      occasions: item.occasions, keywordsUsed: item.keywords_used
     });
     setActiveTab('result');
   };
@@ -263,13 +267,8 @@ function App() {
       const { error } = await supabase.from('listings').delete().eq('id', id);
       if (error) throw error;
       setListings(prev => prev.filter(item => item.id !== id));
-      if (selectedListing?.id === id) {
-        setSelectedListing(null);
-        setListing(null);
-      }
-    } catch (err) {
-      console.error('Error deleting:', err);
-    }
+      if (selectedListing?.id === id) { setSelectedListing(null); setListing(null); }
+    } catch (err) { console.error('Error deleting:', err); }
   };
 
   const copyToClipboard = async (text, section) => {
@@ -277,9 +276,7 @@ function App() {
       await navigator.clipboard.writeText(text);
       setCopiedSection(section);
       setTimeout(() => setCopiedSection(null), 2000);
-    } catch (err) {
-      console.error('Failed to copy:', err);
-    }
+    } catch (err) { console.error('Failed to copy:', err); }
   };
 
   const downloadListing = () => {
@@ -333,11 +330,7 @@ function App() {
             {authMode === 'signin' && (
               <div className="remember-me">
                 <label>
-                  <input
-                    type="checkbox"
-                    checked={rememberMe}
-                    onChange={(e) => setRememberMe(e.target.checked)}
-                  />
+                  <input type="checkbox" checked={rememberMe} onChange={(e) => setRememberMe(e.target.checked)} />
                   Remember me
                 </label>
               </div>
@@ -348,6 +341,9 @@ function App() {
       </div>
     );
   }
+
+  const menCount = listings.filter(l => (l.gender || 'men') === 'men').length;
+  const womenCount = listings.filter(l => l.gender === 'women').length;
 
   return (
     <div className="app">
@@ -362,27 +358,21 @@ function App() {
       <nav className="nav">
         <button className={activeTab === 'generate' ? 'active' : ''} onClick={() => { setActiveTab('generate'); setSelectedListing(null); }}>Generate</button>
         <button className={activeTab === 'result' ? 'active' : ''} onClick={() => setActiveTab('result')} disabled={!listing}>Result</button>
-        <button className={activeTab === 'listings' ? 'active' : ''} onClick={() => setActiveTab('listings')}>All Listings ({listings.length})</button>
+        <button className={activeTab === 'listings' ? 'active' : ''} onClick={() => setActiveTab('listings')}>
+          All Listings ({listings.length})
+        </button>
       </nav>
 
       <main className="main">
+
+        {/* GENERATE TAB */}
         {activeTab === 'generate' && (
           <div className="generate-section">
             <div className="section-header">
               <h2>Generate New Listing</h2>
               <div className="gender-toggle">
-                <button
-                  className={gender === 'men' ? 'active' : ''}
-                  onClick={() => setGender('men')}
-                >
-                  Men's Shoes
-                </button>
-                <button
-                  className={gender === 'women' ? 'active' : ''}
-                  onClick={() => setGender('women')}
-                >
-                  Women's Shoes
-                </button>
+                <button className={gender === 'men' ? 'active' : ''} onClick={() => setGender('men')}>Men's Shoes</button>
+                <button className={gender === 'women' ? 'active' : ''} onClick={() => setGender('women')}>Women's Shoes</button>
               </div>
             </div>
             <div className="upload-area">
@@ -423,15 +413,46 @@ function App() {
           </div>
         )}
 
+        {/* RESULT TAB */}
         {activeTab === 'result' && listing && (
           <div className="result-section">
+
+            {/* Duplicate Warning Banner */}
+            {duplicateWarning && (
+              <div className="duplicate-warning">
+                <div className="dupe-icon">⚠️</div>
+                <div className="dupe-content">
+                  <strong>Similar listing already exists</strong>
+                  <p>{duplicateWarning.matches.length} similar listing(s) found in your library:</p>
+                  <div className="dupe-matches">
+                    {duplicateWarning.matches.map(m => (
+                      <div key={m.id} className="dupe-match">
+                        <span className={`gender-badge ${m.gender || 'men'}`}>{(m.gender || 'men') === 'men' ? 'M' : 'W'}</span>
+                        <span className="dupe-sku">{cleanText(m.sku)}</span>
+                        <span className="dupe-title">{m.title?.substring(0, 55)}...</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                <div className="dupe-actions">
+                  <button className="dupe-save" onClick={handleSaveAnyway}>Save Anyway</button>
+                  <button className="dupe-discard" onClick={handleDiscard}>Discard</button>
+                </div>
+              </div>
+            )}
+
             <div className="section-header">
-              <h2>{selectedListing ? 'Viewing Saved Listing' : 'Generated Listing'}</h2>
+              <div className="result-breadcrumb">
+                <span className="breadcrumb-link" onClick={() => setActiveTab('listings')}>All Listings</span>
+                <span className="breadcrumb-sep">›</span>
+                <span>{selectedListing ? cleanText(selectedListing.sku) : 'New Result'}</span>
+              </div>
               <div className="section-actions">
                 <button className="action-btn" onClick={downloadListing}>Download</button>
-                <button className="action-btn primary" onClick={() => { setActiveTab('generate'); setListing(null); setSelectedListing(null); setImages([]); setImageBase64s([]); setImageFiles([]); setGender('men'); }}>New Listing</button>
+                <button className="action-btn primary" onClick={() => { setActiveTab('generate'); setListing(null); setSelectedListing(null); setImages([]); setImageBase64s([]); setImageFiles([]); setGender('men'); setDuplicateWarning(null); }}>+ New Listing</button>
               </div>
             </div>
+
             <div className="cards-grid">
               <ListingCard title="1. Product Analysis" content={listing.productAnalysis} section="analysis" />
               <ListingCard title="2. Focus Keyword" content={listing.focusKeyword} section="focus" />
@@ -450,12 +471,40 @@ function App() {
           </div>
         )}
 
+        {/* LISTINGS TAB */}
         {activeTab === 'listings' && (
           <div className="listings-section">
-            <div className="section-header">
-              <h2>All Listings</h2>
-              <span className="listing-count">{listings.length} listings</span>
+
+            {/* Toolbar */}
+            <div className="listings-toolbar">
+              <div className="listings-toolbar-left">
+                <div className="filter-tabs">
+                  <button className={listingsFilter === 'all' ? 'active' : ''} onClick={() => setListingsFilter('all')}>
+                    All <span className="filter-count">{listings.length}</span>
+                  </button>
+                  <button className={listingsFilter === 'men' ? 'active' : ''} onClick={() => setListingsFilter('men')}>
+                    Men's <span className="filter-count">{menCount}</span>
+                  </button>
+                  <button className={listingsFilter === 'women' ? 'active' : ''} onClick={() => setListingsFilter('women')}>
+                    Women's <span className="filter-count">{womenCount}</span>
+                  </button>
+                </div>
+              </div>
+              <div className="listings-toolbar-right">
+                <div className="search-box">
+                  <span className="search-icon">🔍</span>
+                  <input
+                    type="text"
+                    placeholder="Search title, SKU, keyword..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                  />
+                  {searchQuery && <button className="search-clear" onClick={() => setSearchQuery('')}>×</button>}
+                </div>
+                <span className="results-count">{filteredListings.length} results</span>
+              </div>
             </div>
+
             {listingsLoading ? (
               <div className="loading-state"><div className="spinner"></div><p>Loading listings...</p></div>
             ) : listings.length === 0 ? (
@@ -463,43 +512,46 @@ function App() {
                 <p>No listings yet</p>
                 <button onClick={() => setActiveTab('generate')}>Generate your first listing</button>
               </div>
+            ) : filteredListings.length === 0 ? (
+              <div className="empty-state"><p>No listings match your search</p></div>
             ) : (
               <div className="data-table">
                 <table>
                   <thead>
                     <tr>
-                      <th>#</th>
-                      <th>Image</th>
-                      <th>Date</th>
-                      <th>Title</th>
-                      <th>Focus Keyword</th>
-                      <th>SKU</th>
-                      <th>Actions</th>
+                      <th className="col-num">#</th>
+                      <th className="col-img">IMG</th>
+                      <th className="col-gender">TYPE</th>
+                      <th className="col-date">DATE</th>
+                      <th className="col-title">TITLE</th>
+                      <th className="col-keyword">FOCUS KEYWORD</th>
+                      <th className="col-sku">SKU</th>
+                      <th className="col-actions">ACTIONS</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {listings.map((item, index) => (
+                    {filteredListings.map((item, index) => (
                       <tr key={item.id} onClick={() => viewListing(item)}>
-                        <td className="serial-cell">{index + 1}</td>
-                        <td className="thumbnail-cell">
+                        <td className="col-num">{index + 1}</td>
+                        <td className="col-img">
                           {item.thumbnail ? (
-                            <img
-                              src={`data:image/jpeg;base64,${item.thumbnail}`}
-                              alt={item.title}
-                              className="table-thumbnail"
-                              style={{ width: '60px', height: '60px', objectFit: 'cover', borderRadius: '4px', display: 'block' }}
-                            />
+                            <img src={`data:image/jpeg;base64,${item.thumbnail}`} alt="" className="table-thumbnail" />
                           ) : (
-                            <div className="no-thumbnail">No img</div>
+                            <div className="no-thumbnail">—</div>
                           )}
                         </td>
-                        <td>{new Date(item.created_at).toLocaleDateString()}</td>
-                        <td className="title-cell">{item.title?.replace(/\*\*/g, '').substring(0, 50)}...</td>
-                        <td>{item.focus_keyword?.replace(/\*\*/g, '')}</td>
-                        <td className="sku-cell">{item.sku?.replace(/\*\*/g, '')}</td>
-                        <td className="actions-cell">
-                          <button className="view-btn" onClick={(e) => { e.stopPropagation(); viewListing(item); }}>View</button>
-                          <button className="delete-btn" onClick={(e) => deleteListing(item.id, e)}>Delete</button>
+                        <td className="col-gender">
+                          <span className={`gender-badge ${item.gender || 'men'}`}>
+                            {(item.gender || 'men') === 'men' ? 'MEN' : 'WMN'}
+                          </span>
+                        </td>
+                        <td className="col-date">{new Date(item.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: '2-digit' })}</td>
+                        <td className="col-title">{cleanText(item.title).substring(0, 52)}{item.title?.length > 52 ? '…' : ''}</td>
+                        <td className="col-keyword">{cleanText(item.focus_keyword).substring(0, 36)}{item.focus_keyword?.length > 36 ? '…' : ''}</td>
+                        <td className="col-sku">{cleanText(item.sku)}</td>
+                        <td className="col-actions" onClick={e => e.stopPropagation()}>
+                          <button className="view-btn" onClick={() => viewListing(item)}>View</button>
+                          <button className="delete-btn" onClick={(e) => deleteListing(item.id, e)}>Del</button>
                         </td>
                       </tr>
                     ))}
@@ -509,6 +561,7 @@ function App() {
             )}
           </div>
         )}
+
       </main>
 
       <footer className="footer">
