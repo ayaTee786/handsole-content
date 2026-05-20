@@ -26,11 +26,21 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: 'No images provided' });
     }
 
+    // Auto-detect media type from base64 header
+    const detectMediaType = (base64) => {
+      const header = base64.substring(0, 4);
+      if (header.startsWith('iVBO')) return 'image/png';
+      if (header.startsWith('/9j/')) return 'image/jpeg';
+      if (header.startsWith('R0lG')) return 'image/gif';
+      if (header.startsWith('UklG')) return 'image/webp';
+      return 'image/jpeg'; // fallback
+    };
+
     const imageContent = [{
       type: 'image',
       source: {
         type: 'base64',
-        media_type: 'image/jpeg',
+        media_type: detectMediaType(images[0]),
         data: images[0]
       }
     }];
