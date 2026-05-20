@@ -112,6 +112,22 @@ function App() {
     });
   }, [listings, listingsFilter, searchQuery]);
 
+  // Compute SHA-256 fingerprint of image before API call
+  const computeImageHash = async (base64String) => {
+    const data = new TextEncoder().encode(base64String.substring(0, 3000));
+    const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+    return Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, '0')).join('').substring(0, 32);
+  };
+
+  // Check for duplicate by image hash BEFORE calling API
+  const checkImageHash = async (hash) => {
+    const { data } = await supabase.from('listings')
+      .select('id, title, focus_keyword, sku, gender')
+      .eq('user_id', session.user.id)
+      .eq('image_hash', hash);
+    return data || [];
+  };
+
   // Check for duplicate listings before saving
   const checkForDuplicates = async (focusKeyword) => {
     if (!focusKeyword) return [];
@@ -125,11 +141,12 @@ function App() {
   };
 
   // Extracted save logic
-  const performSave = async (data, thumbnail, genderVal) => {
+  const performSave = async (data, thumbnail, genderVal, imageHash = null) => {
     const { error: insertError } = await supabase.from('listings').insert({
       user_id: session.user.id,
       thumbnail,
       gender: genderVal,
+      image_hash: imageHash,
       title: data.title || 'Untitled',
       focus_keyword: data.focusKeyword || '',
       sku: data.sku || '',
@@ -202,33 +219,27 @@ function App() {
     if (imageBase64s.length === 0) { setError('Please upload at least one product image'); return; }
     setLoading(true); setError(null); setDuplicateWarning(null);
     try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 120000);
+      // Step 1: Compress images
       const compressedImages = await Promise.all(imageFiles.map(f => compressForAPI(f)));
-      const response = await fetch('/api/generate-listing', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ images: compressedImages, additionalColors: productDetails.additionalColors, customNotes: productDetails.customNotes, gender }),
-        signal: controller.signal
-      });
-      clearTimeout(timeoutId);
-      if (!response.ok) { const e = await response.json(); throw new Error(e.error || 'Failed to generate listing'); }
 
-      const data = await response.json();
-      setListing(data);
-
-      const thumbnail = imageFiles[0] ? await generateThumbnail(imageFiles[0]) : null;
-
-      // Duplicate check
-      const dupes = await checkForDuplicates(data.focusKeyword);
-      if (dupes.length > 0) {
-        setDuplicateWarning({ matches: dupes, pendingListing: data, pendingThumbnail: thumbnail, pendingGender: gender });
-        setActiveTab('result');
+      // Step 2: Hash check BEFORE API call — zero tokens wasted
+      const imageHash = await computeImageHash(compressedImages[0]);
+      const hashDupes = await checkImageHash(imageHash);
+      if (hashDupes.length > 0) {
+        // Stop immediately — show warning on generate page, no API call
+        setDuplicateWarning({
+          type: 'image',
+          matches: hashDupes,
+          pendingCompressed: compressedImages,
+          pendingHash: imageHash,
+          pendingGender: gender
+        });
+        setLoading(false);
         return;
       }
 
-      await performSave(data, thumbnail, gender);
-      setActiveTab('result');
+      // Step 3: No duplicate — proceed with API
+      await callAPIAndSave(compressedImages, imageHash);
     } catch (err) {
       setError(err.name === 'AbortError' ? 'Request timed out. Please try again.' : err.message || 'An error occurred');
     } finally {
@@ -236,9 +247,53 @@ function App() {
     }
   };
 
+  // Separated so "Generate Anyway" can reuse it
+  const callAPIAndSave = async (compressedImages, imageHash) => {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 120000);
+    const response = await fetch('/api/generate-listing', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ images: compressedImages, additionalColors: productDetails.additionalColors, customNotes: productDetails.customNotes, gender }),
+      signal: controller.signal
+    });
+    clearTimeout(timeoutId);
+    if (!response.ok) { const e = await response.json(); throw new Error(e.error || 'Failed to generate listing'); }
+
+    const data = await response.json();
+    setListing(data);
+
+    const thumbnail = imageFiles[0] ? await generateThumbnail(imageFiles[0]) : null;
+
+    // Keyword duplicate check after generation (catches same shoe, different image)
+    const keywordDupes = await checkForDuplicates(data.focusKeyword);
+    if (keywordDupes.length > 0) {
+      setDuplicateWarning({ type: 'keyword', matches: keywordDupes, pendingListing: data, pendingThumbnail: thumbnail, pendingHash: imageHash, pendingGender: gender });
+      setActiveTab('result');
+      return;
+    }
+
+    await performSave(data, thumbnail, gender, imageHash);
+    setActiveTab('result');
+  };
+
+  const handleGenerateAnyway = async () => {
+    if (!duplicateWarning) return;
+    const { pendingCompressed, pendingHash, pendingGender } = duplicateWarning;
+    setDuplicateWarning(null);
+    setLoading(true);
+    try {
+      await callAPIAndSave(pendingCompressed, pendingHash);
+    } catch (err) {
+      setError(err.message || 'An error occurred');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleSaveAnyway = async () => {
     if (!duplicateWarning) return;
-    await performSave(duplicateWarning.pendingListing, duplicateWarning.pendingThumbnail, duplicateWarning.pendingGender);
+    await performSave(duplicateWarning.pendingListing, duplicateWarning.pendingThumbnail, duplicateWarning.pendingGender, duplicateWarning.pendingHash);
     setDuplicateWarning(null);
   };
 
@@ -407,6 +462,31 @@ function App() {
               </div>
             </div>
             {error && <div className="error-msg">{error}</div>}
+
+            {/* Pre-generation duplicate warning — shown on generate page, no tokens spent */}
+            {duplicateWarning?.type === 'image' && (
+              <div className="duplicate-warning">
+                <div className="dupe-icon">🛑</div>
+                <div className="dupe-content">
+                  <strong>Same image already has a listing</strong>
+                  <p>This exact image was used before. No tokens spent yet.</p>
+                  <div className="dupe-matches">
+                    {duplicateWarning.matches.map(m => (
+                      <div key={m.id} className="dupe-match">
+                        <span className={`gender-badge ${m.gender || 'men'}`}>{(m.gender || 'men') === 'men' ? 'M' : 'W'}</span>
+                        <span className="dupe-sku">{cleanText(m.sku)}</span>
+                        <span className="dupe-title">{m.title?.substring(0, 55)}...</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                <div className="dupe-actions">
+                  <button className="dupe-save" onClick={handleGenerateAnyway}>Generate Anyway</button>
+                  <button className="dupe-discard" onClick={() => setDuplicateWarning(null)}>Cancel</button>
+                </div>
+              </div>
+            )}
+
             <button className="generate-btn" onClick={generateListing} disabled={loading || images.length === 0}>
               {loading ? <><span className="spinner"></span>Generating...</> : 'Generate Listing'}
             </button>
@@ -417,8 +497,8 @@ function App() {
         {activeTab === 'result' && listing && (
           <div className="result-section">
 
-            {/* Duplicate Warning Banner */}
-            {duplicateWarning && (
+            {/* Post-generation duplicate warning — similar shoe from different image */}
+            {duplicateWarning?.type === 'keyword' && (
               <div className="duplicate-warning">
                 <div className="dupe-icon">⚠️</div>
                 <div className="dupe-content">
