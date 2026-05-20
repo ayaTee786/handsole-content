@@ -2,6 +2,27 @@ import { useState, useCallback, useEffect } from 'react';
 import { supabase } from './supabaseClient';
 import './App.css';
 
+// Compress image before sending to API (keeps under Vercel 4.5MB limit)
+const compressForAPI = (file, maxSize = 1024) => {
+  return new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        const scale = Math.min(maxSize / img.width, maxSize / img.height, 1);
+        canvas.width = img.width * scale;
+        canvas.height = img.height * scale;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        resolve(canvas.toDataURL('image/jpeg', 0.8).split(',')[1]);
+      };
+      img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+  });
+};
+
 // Resize image to small thumbnail before saving to Supabase
 const generateThumbnail = (file, maxSize = 80) => {
   return new Promise((resolve) => {
@@ -153,11 +174,13 @@ function App() {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 120000);
 
+      const compressedImages = await Promise.all(imageFiles.map(f => compressForAPI(f)));
+
       const response = await fetch('/api/generate-listing', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          images: imageBase64s,
+          images: compressedImages,
           additionalColors: productDetails.additionalColors,
           customNotes: productDetails.customNotes
         }),
