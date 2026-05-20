@@ -498,14 +498,16 @@ function parseListingResponse(response) {
 }
 
 function extractSection(text, sectionName) {
+  // Strip trailing dashes helper
+  const clean = (s) => s.trim().replace(/-{3,}\s*$/g, "").trim();
   let regex = new RegExp(`##\\s*${sectionName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}[:\\s]*([\\s\\S]*?)(?=\\n##|$)`, 'i');
   let match = text.match(regex);
-  if (match?.[1]?.trim()) return match[1].trim();
+  if (match?.[1]?.trim()) return clean(match[1]);
 
   const nameWithoutNumber = sectionName.replace(/^\d+\.\s*/, '');
   regex = new RegExp(`##\\s*${nameWithoutNumber.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}[:\\s]*([\\s\\S]*?)(?=\\n##|$)`, 'i');
   match = text.match(regex);
-  if (match?.[1]?.trim()) return match[1].trim();
+  if (match?.[1]?.trim()) return clean(match[1]);
 
   return null;
 }
