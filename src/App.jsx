@@ -1,4 +1,24 @@
-import { useState, useCallback, useEffect, useMemo } from 'react';
+const [authEmail, setAuthEmail] = useState(() => localStorage.getItem('hs_saved_email') || '');
+  const [authPassword, setAuthPassword] = useState('');
+  const [authError, setAuthError] = useState(null);
+  const [rememberMe, setRememberMe] = useState(() => !!localStorage.getItem('hs_saved_email'));
+
+  // Generate
+  const [images, setImages] = useState([]);
+  const [imageBase64s, setImageBase64s] = useState([]);
+  const [imageFiles, setImageFiles] = useState([]);
+  const [productDetails, setProductDetails] = useState({ additionalColors: '', customNotes: '' });
+  const [gender, setGender] = useState('men');
+  const [listing, setListing] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+
+  // UI
+  const [activeTab, setActiveTab] = useState('generate');
+  const [copiedSection, setCopiedSection] = useState(null);
+  const [selectedListing, setSelectedListing] = useState(null);
+
+  // Listings + filtersimport { useState, useCallback, useEffect, useMemo } from 'react';
 import { supabase } from './supabaseClient';
 import './App.css';
 
@@ -43,27 +63,7 @@ function App() {
   const [session, setSession] = useState(null);
   const [authLoading, setAuthLoading] = useState(true);
   const [authMode, setAuthMode] = useState('signin');
-  const [authEmail, setAuthEmail] = useState(() => localStorage.getItem('hs_saved_email') || '');
-  const [authPassword, setAuthPassword] = useState('');
-  const [authError, setAuthError] = useState(null);
-  const [rememberMe, setRememberMe] = useState(() => !!localStorage.getItem('hs_saved_email'));
 
-  // Generate
-  const [images, setImages] = useState([]);
-  const [imageBase64s, setImageBase64s] = useState([]);
-  const [imageFiles, setImageFiles] = useState([]);
-  const [productDetails, setProductDetails] = useState({ additionalColors: '', customNotes: '' });
-  const [gender, setGender] = useState('men');
-  const [listing, setListing] = useState(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
-
-  // UI
-  const [activeTab, setActiveTab] = useState('generate');
-  const [copiedSection, setCopiedSection] = useState(null);
-  const [selectedListing, setSelectedListing] = useState(null);
-
-  // Listings + filters
   const [listings, setListings] = useState([]);
   const [listingsLoading, setListingsLoading] = useState(false);
   const [listingsFilter, setListingsFilter] = useState('all');
@@ -676,7 +676,6 @@ function App() {
                   </div>
                 </div>
               )}
-            )}
           </div>
         )}
 
