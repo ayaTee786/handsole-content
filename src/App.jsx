@@ -66,6 +66,8 @@ function App() {
   const [searchQuery, setSearchQuery] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [perPage, setPerPage] = useState(50);
+  const [sortCol, setSortCol] = useState('created_at');
+  const [sortDir, setSortDir] = useState('desc');
 
   const [duplicateWarning, setDuplicateWarning] = useState(null);
 
@@ -97,7 +99,7 @@ function App() {
   };
 
   const filteredListings = useMemo(() => {
-    return listings.filter(item => {
+    const filtered = listings.filter(item => {
       const matchesGender = listingsFilter === 'all' || (item.gender || 'men') === listingsFilter;
       const q = searchQuery.toLowerCase();
       const matchesSearch = !q ||
@@ -106,7 +108,52 @@ function App() {
         item.focus_keyword?.toLowerCase().includes(q);
       return matchesGender && matchesSearch;
     });
-  }, [listings, listingsFilter, searchQuery]);
+    return [...filtered].sort((a, b) => {
+      let aVal = a[sortCol] || '';
+      let bVal = b[sortCol] || '';
+      if (sortCol === 'created_at') {
+        aVal = new Date(aVal); bVal = new Date(bVal);
+      } else {
+        aVal = aVal.toString().toLowerCase(); bVal = bVal.toString().toLowerCase();
+      }
+      if (aVal < bVal) return sortDir === 'asc' ? -1 : 1;
+      if (aVal > bVal) return sortDir === 'asc' ? 1 : -1;
+      return 0;
+    });
+  }, [listings, listingsFilter, searchQuery, sortCol, sortDir]);
+
+  const handleSort = (col) => {
+    if (sortCol === col) setSortDir(d => d === 'asc' ? 'desc' : 'asc');
+    else { setSortCol(col); setSortDir('asc'); }
+    setCurrentPage(1);
+  };
+
+  const SortIcon = ({ col }) => {
+    if (sortCol !== col) return <span className="sort-icon inactive">↕</span>;
+    return <span className="sort-icon active">{sortDir === 'asc' ? '↑' : '↓'}</span>;
+  };
+
+  const exportCSV = () => {
+    const headers = ['#', 'Date', 'Gender', 'Title', 'Focus Keyword', 'SKU', 'Shop Category', 'Occasions'];
+    const rows = filteredListings.map((item, i) => [
+      i + 1,
+      new Date(item.created_at).toLocaleDateString(),
+      item.gender || 'men',
+      `"${cleanText(item.title).replace(/"/g, '""')}"`,
+      `"${cleanText(item.focus_keyword).replace(/"/g, '""')}"`,
+      cleanText(item.sku),
+      `"${cleanText(item.shop_category).replace(/"/g, '""')}"`,
+      `"${cleanText(item.occasions).replace(/"/g, '""')}"`
+    ]);
+    const csv = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `handsole-listings-${Date.now()}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
 
   useEffect(() => { setCurrentPage(1); }, [listingsFilter, searchQuery]);
 
@@ -541,6 +588,7 @@ function App() {
                   {searchQuery && <button className="search-clear" onClick={() => setSearchQuery('')}>×</button>}
                 </div>
                 <span className="results-count">{filteredListings.length} results</span>
+                <button className="export-btn" onClick={exportCSV}>↓ Export CSV</button>
               </div>
             </div>
 
@@ -561,11 +609,11 @@ function App() {
                       <tr>
                         <th className="col-num">#</th>
                         <th className="col-img">IMG</th>
-                        <th className="col-gender">TYPE</th>
-                        <th className="col-date">DATE</th>
-                        <th className="col-title">TITLE</th>
-                        <th className="col-keyword">FOCUS KEYWORD</th>
-                        <th className="col-sku">SKU</th>
+                        <th className="col-gender sortable" onClick={() => handleSort('gender')}>TYPE <SortIcon col="gender" /></th>
+                        <th className="col-date sortable" onClick={() => handleSort('created_at')}>DATE <SortIcon col="created_at" /></th>
+                        <th className="col-title sortable" onClick={() => handleSort('title')}>TITLE <SortIcon col="title" /></th>
+                        <th className="col-keyword sortable" onClick={() => handleSort('focus_keyword')}>FOCUS KEYWORD <SortIcon col="focus_keyword" /></th>
+                        <th className="col-sku sortable" onClick={() => handleSort('sku')}>SKU <SortIcon col="sku" /></th>
                         <th className="col-actions">ACTIONS</th>
                       </tr>
                     </thead>
