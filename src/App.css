@@ -386,3 +386,11 @@ body {
   transition: all 0.15s; white-space: nowrap; font-weight: 500;
 }
 .export-btn:hover { background: #f4f5f7; border-color: #c1c7d0; }
+
+/* ── CHECKBOX SELECTION ─────────────────────────────── */
+.col-check { width: 36px; text-align: center; padding: 7px 8px !important; }
+.col-check input[type="checkbox"] { width: 14px; height: 14px; accent-color: #0052cc; cursor: pointer; }
+.data-table tbody tr.selected { background: #e8f0fe !important; }
+.data-table tbody tr.selected:hover { background: #d0e4ff !important; }
+.export-btn.selected { background: #0052cc; color: #fff; border-color: #0052cc; }
+.export-btn.selected:hover { background: #0043a8; }
