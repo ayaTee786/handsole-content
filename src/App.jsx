@@ -68,6 +68,7 @@ function App() {
   const [perPage, setPerPage] = useState(50);
   const [sortCol, setSortCol] = useState('created_at');
   const [sortDir, setSortDir] = useState('desc');
+  const [selectedRows, setSelectedRows] = useState(new Set());
 
   const [duplicateWarning, setDuplicateWarning] = useState(null);
 
@@ -133,9 +134,25 @@ function App() {
     return <span className="sort-icon active">{sortDir === 'asc' ? '↑' : '↓'}</span>;
   };
 
-  const exportCSV = () => {
+  const toggleRow = (id) => {
+    setSelectedRows(prev => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  };
+
+  const toggleAll = () => {
+    if (selectedRows.size === paginatedListings.length) {
+      setSelectedRows(new Set());
+    } else {
+      setSelectedRows(new Set(paginatedListings.map(i => i.id)));
+    }
+  };
+
+  const exportCSVData = (items, filename) => {
     const headers = ['#', 'Date', 'Gender', 'Title', 'Focus Keyword', 'SKU', 'Shop Category', 'Occasions'];
-    const rows = filteredListings.map((item, i) => [
+    const rows = items.map((item, i) => [
       i + 1,
       new Date(item.created_at).toLocaleDateString(),
       item.gender || 'men',
@@ -150,9 +167,16 @@ function App() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `handsole-listings-${Date.now()}.csv`;
+    a.download = filename;
     a.click();
     URL.revokeObjectURL(url);
+  };
+
+  const exportCSV = () => exportCSVData(filteredListings, `handsole-all-${Date.now()}.csv`);
+
+  const exportSelected = () => {
+    const items = filteredListings.filter(i => selectedRows.has(i.id));
+    exportCSVData(items, `handsole-selected-${Date.now()}.csv`);
   };
 
   useEffect(() => { setCurrentPage(1); }, [listingsFilter, searchQuery]);
@@ -588,7 +612,12 @@ function App() {
                   {searchQuery && <button className="search-clear" onClick={() => setSearchQuery('')}>×</button>}
                 </div>
                 <span className="results-count">{filteredListings.length} results</span>
-                <button className="export-btn" onClick={exportCSV}>↓ Export CSV</button>
+                {selectedRows.size > 0 && (
+                  <button className="export-btn selected" onClick={exportSelected}>
+                    ↓ Export Selected ({selectedRows.size})
+                  </button>
+                )}
+                <button className="export-btn" onClick={exportCSV}>↓ Export All</button>
               </div>
             </div>
 
@@ -607,6 +636,12 @@ function App() {
                   <table>
                     <thead>
                       <tr>
+                        <th className="col-check">
+                          <input type="checkbox"
+                            checked={paginatedListings.length > 0 && selectedRows.size === paginatedListings.length}
+                            onChange={toggleAll}
+                          />
+                        </th>
                         <th className="col-num">#</th>
                         <th className="col-img">IMG</th>
                         <th className="col-gender sortable" onClick={() => handleSort('gender')}>TYPE <SortIcon col="gender" /></th>
@@ -619,7 +654,10 @@ function App() {
                     </thead>
                     <tbody>
                       {paginatedListings.map((item, index) => (
-                        <tr key={item.id} onClick={() => viewListing(item)}>
+                        <tr key={item.id} onClick={() => viewListing(item)} className={selectedRows.has(item.id) ? 'selected' : ''}>
+                          <td className="col-check" onClick={e => { e.stopPropagation(); toggleRow(item.id); }}>
+                            <input type="checkbox" checked={selectedRows.has(item.id)} onChange={() => toggleRow(item.id)} />
+                          </td>
                           <td className="col-num">{(currentPage - 1) * perPage + index + 1}</td>
                           <td className="col-img">
                             {item.thumbnail ? (
