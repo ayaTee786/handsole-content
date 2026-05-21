@@ -36,7 +36,7 @@ const generateThumbnail = (file, maxSize = 80) => new Promise((resolve) => {
   reader.readAsDataURL(file);
 });
 
-const cleanText = (text) => text?.replace(/\*\*/g, '').replace(/-{3,}/g, '').trim() || '';
+const cleanText = (text) => text?.replace(/\*\*/g, '').replace(/-{3,}/g, '').replace(/`{1,3}/g, '').trim() || '';
 
 function App() {
   const [session, setSession] = useState(null);
@@ -655,8 +655,11 @@ function App() {
                     <tbody>
                       {paginatedListings.map((item, index) => (
                         <tr key={item.id} onClick={() => viewListing(item)} className={selectedRows.has(item.id) ? 'selected' : ''}>
-                          <td className="col-check" onClick={e => { e.stopPropagation(); toggleRow(item.id); }}>
-                            <input type="checkbox" checked={selectedRows.has(item.id)} onChange={() => toggleRow(item.id)} />
+                          <td className="col-check" onClick={e => e.stopPropagation()}>
+                            <input type="checkbox" checked={selectedRows.has(item.id)}
+                              onChange={() => toggleRow(item.id)}
+                              onClick={e => e.stopPropagation()}
+                            />
                           </td>
                           <td className="col-num">{(currentPage - 1) * perPage + index + 1}</td>
                           <td className="col-img">
