@@ -1,24 +1,4 @@
-const [authEmail, setAuthEmail] = useState(() => localStorage.getItem('hs_saved_email') || '');
-  const [authPassword, setAuthPassword] = useState('');
-  const [authError, setAuthError] = useState(null);
-  const [rememberMe, setRememberMe] = useState(() => !!localStorage.getItem('hs_saved_email'));
-
-  // Generate
-  const [images, setImages] = useState([]);
-  const [imageBase64s, setImageBase64s] = useState([]);
-  const [imageFiles, setImageFiles] = useState([]);
-  const [productDetails, setProductDetails] = useState({ additionalColors: '', customNotes: '' });
-  const [gender, setGender] = useState('men');
-  const [listing, setListing] = useState(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
-
-  // UI
-  const [activeTab, setActiveTab] = useState('generate');
-  const [copiedSection, setCopiedSection] = useState(null);
-  const [selectedListing, setSelectedListing] = useState(null);
-
-  // Listings + filtersimport { useState, useCallback, useEffect, useMemo } from 'react';
+import { useState, useCallback, useEffect, useMemo } from 'react';
 import { supabase } from './supabaseClient';
 import './App.css';
 
@@ -59,10 +39,26 @@ const generateThumbnail = (file, maxSize = 80) => new Promise((resolve) => {
 const cleanText = (text) => text?.replace(/\*\*/g, '').replace(/-{3,}/g, '').trim() || '';
 
 function App() {
-  // Auth
   const [session, setSession] = useState(null);
   const [authLoading, setAuthLoading] = useState(true);
   const [authMode, setAuthMode] = useState('signin');
+  const [authEmail, setAuthEmail] = useState(() => localStorage.getItem('hs_saved_email') || '');
+  const [authPassword, setAuthPassword] = useState('');
+  const [authError, setAuthError] = useState(null);
+  const [rememberMe, setRememberMe] = useState(() => !!localStorage.getItem('hs_saved_email'));
+
+  const [images, setImages] = useState([]);
+  const [imageBase64s, setImageBase64s] = useState([]);
+  const [imageFiles, setImageFiles] = useState([]);
+  const [productDetails, setProductDetails] = useState({ additionalColors: '', customNotes: '' });
+  const [gender, setGender] = useState('men');
+  const [listing, setListing] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+
+  const [activeTab, setActiveTab] = useState('generate');
+  const [copiedSection, setCopiedSection] = useState(null);
+  const [selectedListing, setSelectedListing] = useState(null);
 
   const [listings, setListings] = useState([]);
   const [listingsLoading, setListingsLoading] = useState(false);
@@ -71,7 +67,6 @@ function App() {
   const [currentPage, setCurrentPage] = useState(1);
   const [perPage, setPerPage] = useState(50);
 
-  // Duplicate detection
   const [duplicateWarning, setDuplicateWarning] = useState(null);
 
   useEffect(() => {
@@ -101,7 +96,6 @@ function App() {
     }
   };
 
-  // Filtered listings
   const filteredListings = useMemo(() => {
     return listings.filter(item => {
       const matchesGender = listingsFilter === 'all' || (item.gender || 'men') === listingsFilter;
@@ -114,20 +108,17 @@ function App() {
     });
   }, [listings, listingsFilter, searchQuery]);
 
-  // Reset to page 1 when filter or search changes
   useEffect(() => { setCurrentPage(1); }, [listingsFilter, searchQuery]);
 
   const totalPages = Math.ceil(filteredListings.length / perPage);
   const paginatedListings = filteredListings.slice((currentPage - 1) * perPage, currentPage * perPage);
 
-  // Compute SHA-256 fingerprint of image before API call
   const computeImageHash = async (base64String) => {
     const data = new TextEncoder().encode(base64String.substring(0, 3000));
     const hashBuffer = await crypto.subtle.digest('SHA-256', data);
     return Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, '0')).join('').substring(0, 32);
   };
 
-  // Check for duplicate by image hash BEFORE calling API
   const checkImageHash = async (hash) => {
     const { data } = await supabase.from('listings')
       .select('id, title, focus_keyword, sku, gender')
@@ -136,7 +127,6 @@ function App() {
     return data || [];
   };
 
-  // Check for duplicate listings before saving
   const checkForDuplicates = async (focusKeyword) => {
     if (!focusKeyword) return [];
     const words = focusKeyword.toLowerCase()
@@ -148,7 +138,6 @@ function App() {
     return data || [];
   };
 
-  // Extracted save logic
   const performSave = async (data, thumbnail, genderVal, imageHash = null) => {
     const { error: insertError } = await supabase.from('listings').insert({
       user_id: session.user.id,
@@ -227,26 +216,14 @@ function App() {
     if (imageBase64s.length === 0) { setError('Please upload at least one product image'); return; }
     setLoading(true); setError(null); setDuplicateWarning(null);
     try {
-      // Step 1: Compress images
       const compressedImages = await Promise.all(imageFiles.map(f => compressForAPI(f)));
-
-      // Step 2: Hash check BEFORE API call — zero tokens wasted
       const imageHash = await computeImageHash(compressedImages[0]);
       const hashDupes = await checkImageHash(imageHash);
       if (hashDupes.length > 0) {
-        // Stop immediately — show warning on generate page, no API call
-        setDuplicateWarning({
-          type: 'image',
-          matches: hashDupes,
-          pendingCompressed: compressedImages,
-          pendingHash: imageHash,
-          pendingGender: gender
-        });
+        setDuplicateWarning({ type: 'image', matches: hashDupes, pendingCompressed: compressedImages, pendingHash: imageHash, pendingGender: gender });
         setLoading(false);
         return;
       }
-
-      // Step 3: No duplicate — proceed with API
       await callAPIAndSave(compressedImages, imageHash);
     } catch (err) {
       setError(err.name === 'AbortError' ? 'Request timed out. Please try again.' : err.message || 'An error occurred');
@@ -255,7 +232,6 @@ function App() {
     }
   };
 
-  // Separated so "Generate Anyway" can reuse it
   const callAPIAndSave = async (compressedImages, imageHash) => {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 120000);
@@ -267,36 +243,27 @@ function App() {
     });
     clearTimeout(timeoutId);
     if (!response.ok) { const e = await response.json(); throw new Error(e.error || 'Failed to generate listing'); }
-
     const data = await response.json();
     setListing(data);
-
     const thumbnail = imageFiles[0] ? await generateThumbnail(imageFiles[0]) : null;
-
-    // Keyword duplicate check after generation (catches same shoe, different image)
     const keywordDupes = await checkForDuplicates(data.focusKeyword);
     if (keywordDupes.length > 0) {
       setDuplicateWarning({ type: 'keyword', matches: keywordDupes, pendingListing: data, pendingThumbnail: thumbnail, pendingHash: imageHash, pendingGender: gender });
       setActiveTab('result');
       return;
     }
-
     await performSave(data, thumbnail, gender, imageHash);
     setActiveTab('result');
   };
 
   const handleGenerateAnyway = async () => {
     if (!duplicateWarning) return;
-    const { pendingCompressed, pendingHash, pendingGender } = duplicateWarning;
+    const { pendingCompressed, pendingHash } = duplicateWarning;
     setDuplicateWarning(null);
     setLoading(true);
-    try {
-      await callAPIAndSave(pendingCompressed, pendingHash);
-    } catch (err) {
-      setError(err.message || 'An error occurred');
-    } finally {
-      setLoading(false);
-    }
+    try { await callAPIAndSave(pendingCompressed, pendingHash); }
+    catch (err) { setError(err.message || 'An error occurred'); }
+    finally { setLoading(false); }
   };
 
   const handleSaveAnyway = async () => {
@@ -421,9 +388,7 @@ function App() {
       <nav className="nav">
         <button className={activeTab === 'generate' ? 'active' : ''} onClick={() => { setActiveTab('generate'); setSelectedListing(null); }}>Generate</button>
         <button className={activeTab === 'result' ? 'active' : ''} onClick={() => setActiveTab('result')} disabled={!listing}>Result</button>
-        <button className={activeTab === 'listings' ? 'active' : ''} onClick={() => setActiveTab('listings')}>
-          All Listings ({listings.length})
-        </button>
+        <button className={activeTab === 'listings' ? 'active' : ''} onClick={() => setActiveTab('listings')}>All Listings ({listings.length})</button>
       </nav>
 
       <main className="main">
@@ -470,8 +435,6 @@ function App() {
               </div>
             </div>
             {error && <div className="error-msg">{error}</div>}
-
-            {/* Pre-generation duplicate warning — shown on generate page, no tokens spent */}
             {duplicateWarning?.type === 'image' && (
               <div className="duplicate-warning">
                 <div className="dupe-icon">🛑</div>
@@ -494,7 +457,6 @@ function App() {
                 </div>
               </div>
             )}
-
             <button className="generate-btn" onClick={generateListing} disabled={loading || images.length === 0}>
               {loading ? <><span className="spinner"></span>Generating...</> : 'Generate Listing'}
             </button>
@@ -504,8 +466,6 @@ function App() {
         {/* RESULT TAB */}
         {activeTab === 'result' && listing && (
           <div className="result-section">
-
-            {/* Post-generation duplicate warning — similar shoe from different image */}
             {duplicateWarning?.type === 'keyword' && (
               <div className="duplicate-warning">
                 <div className="dupe-icon">⚠️</div>
@@ -528,7 +488,6 @@ function App() {
                 </div>
               </div>
             )}
-
             <div className="section-header">
               <div className="result-breadcrumb">
                 <span className="breadcrumb-link" onClick={() => setActiveTab('listings')}>All Listings</span>
@@ -540,7 +499,6 @@ function App() {
                 <button className="action-btn primary" onClick={() => { setActiveTab('generate'); setListing(null); setSelectedListing(null); setImages([]); setImageBase64s([]); setImageFiles([]); setGender('men'); setDuplicateWarning(null); }}>+ New Listing</button>
               </div>
             </div>
-
             <div className="cards-grid">
               <ListingCard title="1. Product Analysis" content={listing.productAnalysis} section="analysis" />
               <ListingCard title="2. Focus Keyword" content={listing.focusKeyword} section="focus" />
@@ -562,8 +520,6 @@ function App() {
         {/* LISTINGS TAB */}
         {activeTab === 'listings' && (
           <div className="listings-section">
-
-            {/* Toolbar */}
             <div className="listings-toolbar">
               <div className="listings-toolbar-left">
                 <div className="filter-tabs">
@@ -581,12 +537,7 @@ function App() {
               <div className="listings-toolbar-right">
                 <div className="search-box">
                   <span className="search-icon">🔍</span>
-                  <input
-                    type="text"
-                    placeholder="Search title, SKU, keyword..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                  />
+                  <input type="text" placeholder="Search title, SKU, keyword..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
                   {searchQuery && <button className="search-clear" onClick={() => setSearchQuery('')}>×</button>}
                 </div>
                 <span className="results-count">{filteredListings.length} results</span>
@@ -603,52 +554,51 @@ function App() {
             ) : filteredListings.length === 0 ? (
               <div className="empty-state"><p>No listings match your search</p></div>
             ) : (
-              <div className="data-table">
-                <table>
-                  <thead>
-                    <tr>
-                      <th className="col-num">#</th>
-                      <th className="col-img">IMG</th>
-                      <th className="col-gender">TYPE</th>
-                      <th className="col-date">DATE</th>
-                      <th className="col-title">TITLE</th>
-                      <th className="col-keyword">FOCUS KEYWORD</th>
-                      <th className="col-sku">SKU</th>
-                      <th className="col-actions">ACTIONS</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {paginatedListings.map((item, index) => (
-                      <tr key={item.id} onClick={() => viewListing(item)}>
-                        <td className="col-num">{index + 1}</td>
-                        <td className="col-img">
-                          {item.thumbnail ? (
-                            <img src={`data:image/jpeg;base64,${item.thumbnail}`} alt="" className="table-thumbnail" />
-                          ) : (
-                            <div className="no-thumbnail">—</div>
-                          )}
-                        </td>
-                        <td className="col-gender">
-                          <span className={`gender-badge ${item.gender || 'men'}`}>
-                            {(item.gender || 'men') === 'men' ? 'MEN' : 'WMN'}
-                          </span>
-                        </td>
-                        <td className="col-date">{new Date(item.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: '2-digit' })}</td>
-                        <td className="col-title">{cleanText(item.title).substring(0, 52)}{item.title?.length > 52 ? '…' : ''}</td>
-                        <td className="col-keyword">{cleanText(item.focus_keyword).substring(0, 36)}{item.focus_keyword?.length > 36 ? '…' : ''}</td>
-                        <td className="col-sku">{cleanText(item.sku)}</td>
-                        <td className="col-actions" onClick={e => e.stopPropagation()}>
-                          <button className="view-btn" onClick={() => viewListing(item)}>View</button>
-                          <button className="delete-btn" onClick={(e) => deleteListing(item.id, e)}>Del</button>
-                        </td>
+              <>
+                <div className="data-table">
+                  <table>
+                    <thead>
+                      <tr>
+                        <th className="col-num">#</th>
+                        <th className="col-img">IMG</th>
+                        <th className="col-gender">TYPE</th>
+                        <th className="col-date">DATE</th>
+                        <th className="col-title">TITLE</th>
+                        <th className="col-keyword">FOCUS KEYWORD</th>
+                        <th className="col-sku">SKU</th>
+                        <th className="col-actions">ACTIONS</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+                    </thead>
+                    <tbody>
+                      {paginatedListings.map((item, index) => (
+                        <tr key={item.id} onClick={() => viewListing(item)}>
+                          <td className="col-num">{(currentPage - 1) * perPage + index + 1}</td>
+                          <td className="col-img">
+                            {item.thumbnail ? (
+                              <img src={`data:image/jpeg;base64,${item.thumbnail}`} alt="" className="table-thumbnail" />
+                            ) : (
+                              <div className="no-thumbnail">—</div>
+                            )}
+                          </td>
+                          <td className="col-gender">
+                            <span className={`gender-badge ${item.gender || 'men'}`}>
+                              {(item.gender || 'men') === 'men' ? 'MEN' : 'WMN'}
+                            </span>
+                          </td>
+                          <td className="col-date">{new Date(item.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: '2-digit' })}</td>
+                          <td className="col-title">{cleanText(item.title).substring(0, 52)}{item.title?.length > 52 ? '…' : ''}</td>
+                          <td className="col-keyword">{cleanText(item.focus_keyword).substring(0, 36)}{item.focus_keyword?.length > 36 ? '…' : ''}</td>
+                          <td className="col-sku">{cleanText(item.sku)}</td>
+                          <td className="col-actions" onClick={e => e.stopPropagation()}>
+                            <button className="view-btn" onClick={() => viewListing(item)}>View</button>
+                            <button className="delete-btn" onClick={(e) => deleteListing(item.id, e)}>Del</button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
 
-              {/* Pagination bar */}
-              {filteredListings.length > 0 && (
                 <div className="pagination-bar">
                   <span className="pagination-info">
                     Showing {((currentPage - 1) * perPage) + 1}–{Math.min(currentPage * perPage, filteredListings.length)} of {filteredListings.length}
@@ -675,7 +625,8 @@ function App() {
                     </select>
                   </div>
                 </div>
-              )}
+              </>
+            )}
           </div>
         )}
 
